@@ -14,11 +14,16 @@ load_dotenv()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # MySQL database configuration
+db_host = os.getenv("DATABASE_HOST")
+db_user = os.getenv("DATABASE_USER")
+db_password = os.getenv("DATABASE_PASSWORD")
+db_schema = os.getenv("DATABASE_SCHEMA")
+
 db_config = {
-    'host': os.getenv("DATABASE_HOST"),  # Replace with your MySQL host
-    'user': os.getenv("DATABASE_USER"),       # Replace with your MySQL username
-    'password': os.getenv("DATABSE_PASSWORD"),  # Replace with your MySQL password
-    'database': os.getenv("DATABASE_SCHEMA"),  # Replace with your database name
+    'host': {db_host},  # Replace with your MySQL host
+    'user': {db_user},       # Replace with your MySQL username
+    'password': {db_password},  # Replace with your MySQL password
+    'database': {db_schema},  # Replace with your database name
     'cursorclass': pymysql.cursors.DictCursor  # Use DictCursor for dictionary results
 }
 
