@@ -1,8 +1,40 @@
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd 
+import pymysql
+import urllib3
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Suppress SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# MySQL database configuration
+db_config = {
+    'host': os.getenv("DATABASE_HOST"),  # Replace with your MySQL host
+    'user': os.getenv("DATABASE_USER"),       # Replace with your MySQL username
+    'password': os.getenv("DATABSE_PASSWORD"),  # Replace with your MySQL password
+    'database': os.getenv("DATABASE_SCHEMA"),  # Replace with your database name
+    'cursorclass': pymysql.cursors.DictCursor  # Use DictCursor for dictionary results
+}
 
 app = Flask(__name__)
+
+# Database connection Function
+def get_db_connection():
+    try:
+        # Attempt to connect to the database
+        conn = pymysql.connect(**db_config)
+        print("Database connection successful!")
+        return conn
+    except pymysql.Error as err:
+        # Handle connection errors
+        print(f"Error connecting to the database: {err}")
+        return None
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -16,22 +48,166 @@ def webhook():
         latest_info = scrape_college_website()
         response_text = latest_info if latest_info else "Sorry, I couldn't retrieve the announcement."
         return jsonify({'fulfillmentText': response_text})
-    elif intent=="AdmissionDetails":
-        latest_info=scrape_admission_details()
-        response_text=latest_info if latest_info else "Not able to get required admission info"
+    elif intent == "AdmissionDetails":
+        latest_info = scrape_admission_details()
+        response_text = latest_info if latest_info else "Not able to get required admission info"
         return jsonify({'fulfillmentText': response_text})
     elif intent == "SearchLibraryBooks":
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
-        print("book: ",book_title)
+        print("book: ", book_title)
         if not book_title:
             return jsonify({'fulfillmentText': "Please provide a book title to search for."})
 
         availability_info = scrape_library_website(book_title)
         response_text = availability_info if availability_info else "Sorry, I couldn't retrieve the book details."
         return jsonify({'fulfillmentText': response_text})
+
+    # Faculty Data Retrieval Intents
+    elif intent == "GetPersonByField":
+        field_name = req.get('queryResult', {}).get('parameters', {}).get('fieldName', '')
+        if not field_name:
+            return jsonify({'fulfillmentText': "Please provide a field name to search for."})
+
+        # Connect to MySQL
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor()  # No need for dictionary=True
+
+            # Query the database
+            query = "SELECT FName, LName FROM dummy_facultydata WHERE Field = %s"
+            cursor.execute(query, (field_name,))
+            result = cursor.fetchall()
+
+            # Format the response
+            if result:
+                names = [f"{row['FName']} {row['LName']}" for row in result]
+                response_text = f"Faculty members in {field_name}:\n" + "\n".join(names)
+            else:
+                response_text = f"No faculty members found in {field_name}."
+
+        except pymysql.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+
+        finally:
+            # Close the connection
+            if 'cursor' in locals():
+                cursor.close()
+            if conn:
+                conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+    
+    elif intent == "GetFacultyByGender":
+        gender = req.get('queryResult', {}).get('parameters', {}).get('Gender', '')
+        if not gender:
+            return jsonify({'fulfillmentText': "Please provide a gender to search for."})
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor()
+
+            query = "SELECT FName, LName FROM dummy_facultydata WHERE Gender = %s"
+            cursor.execute(query, (gender,))
+            result = cursor.fetchall()
+
+            if result:
+                names = [f"{row['FName']} {row['LName']}" for row in result]
+                response_text = f"{gender} faculty members:\n" + "\n".join(names)
+            else:
+                response_text = f"No {gender} faculty members found."
+
+        except pymysql.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+
+        finally:
+            # Close the connection
+            if 'cursor' in locals():
+                cursor.close()
+            if conn:
+                conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+    
+    elif intent == "GetPersonDetails":
+        person_name = req.get('queryResult', {}).get('parameters', {}).get('PersonName', '')
+        if not person_name:
+            return jsonify({'fulfillmentText': "Please provide a faculty name to search for."})
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor()
+
+            query = "SELECT * FROM dummy_facultydata WHERE CONCAT(FName, ' ', LName) = %s"
+            cursor.execute(query, (person_name,))
+            result = cursor.fetchone()
+
+            if result:
+                response_text = f"Details for {person_name}:\n" + "\n".join([f"{key}: {value}" for key, value in result.items()])
+            else:
+                response_text = f"No details found for {person_name}."
+
+        except pymysql.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+
+        finally:
+            # Close the connection
+            if 'cursor' in locals():
+                cursor.close()
+            if conn:
+                conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+    
+    elif intent == "GetPeopleByDegree":
+        degree_name = req.get('queryResult', {}).get('parameters', {}).get('DegreeName', '')
+        if not degree_name:
+            return jsonify({'fulfillmentText': "Please provide a degree to search for."})
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor()
+
+            query = "SELECT FName, LName FROM dummy_facultydata WHERE Degree = %s"
+            cursor.execute(query, (degree_name,))
+            result = cursor.fetchall()
+
+            if result:
+                names = [f"{row['FName']} {row['LName']}" for row in result]
+                response_text = f"Faculty members with {degree_name}:\n" + "\n".join(names)
+            else:
+                response_text = f"No faculty members found with {degree_name}."
+
+        except pymysql.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+
+        finally:
+            # Close the connection
+            if 'cursor' in locals():
+                cursor.close()
+            if conn:
+                conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+        
     else:
         print("Intent not recognized:", intent) 
-        return jsonify({'fulfillmentText':"Intent not recognized"})
+        return jsonify({'fulfillmentText': "Intent not recognized"})
 
 def scrape_library_website(book_title):
     # Replace spaces in the book title with '+' for URL encoding
@@ -201,6 +377,7 @@ def scrape_college_website():
     except Exception as e:
         print("Error in scraping:", e)
         return None
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
