@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd 
-import pymysql
+import psycopg2
+from psycopg2.extras import DictCursor  # For dictionary-like results
 import urllib3
 import os
 from dotenv import load_dotenv
@@ -19,27 +20,51 @@ db_user = os.getenv("DATABASE_USER")
 db_password = os.getenv("DATABASE_PASSWORD")
 db_schema = os.getenv("DATABASE_SCHEMA")
 
+
 db_config = {
-    'host': {db_host},  # Replace with your MySQL host
-    'user': {db_user},       # Replace with your MySQL username
-    'password': {db_password},  # Replace with your MySQL password
-    'database': {db_schema},  # Replace with your database name
-    'cursorclass': pymysql.cursors.DictCursor  # Use DictCursor for dictionary results
+    'host': db_host,  # Replace with your MySQL host
+    'user': db_user,       # Replace with your MySQL username
+    'password': db_password,  # Replace with your MySQL password
+    'database': db_schema,  # Replace with your database name
+    'port' : 5432
 }
 
 app = Flask(__name__)
 
-# Database connection Function
+# Database connection function
 def get_db_connection():
     try:
         # Attempt to connect to the database
-        conn = pymysql.connect(**db_config)
+        conn = psycopg2.connect(**db_config)
         print("Database connection successful!")
         return conn
-    except pymysql.Error as err:
+    except psycopg2.Error as err:
         # Handle connection errors
         print(f"Error connecting to the database: {err}")
         return None
+
+
+# # Check if the connection was successful
+# conn = get_db_connection()
+# if conn:
+#     print("Database is connected!")
+    
+#     # Create a cursor
+#     cur = conn.cursor()
+    
+#     # Execute a query
+#     cur.execute("SELECT * FROM dummy_facultydata;")
+    
+#     # Fetch and print results
+#     rows = cur.fetchall()
+#     for row in rows:
+#         print(row)
+    
+#     # Close the cursor and connection
+#     cur.close()
+#     conn.close()
+# else:
+#     print("Failed to connect to the database.")
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -79,23 +104,23 @@ def webhook():
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor()  # No need for dictionary=True
+            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
 
             # Query the database
-            query = "SELECT FName, LName FROM dummy_facultydata WHERE Field = %s"
+            query = "SELECT fname, lname FROM dummy_facultydata WHERE Field = %s"
             cursor.execute(query, (field_name,))
             result = cursor.fetchall()
 
             # Format the response
             if result:
-                names = [f"{row['FName']} {row['LName']}" for row in result]
+                names = [f"{row['fname']} {row['lname']}" for row in result]
                 response_text = f"Faculty members in {field_name}:\n" + "\n".join(names)
             else:
                 response_text = f"No faculty members found in {field_name}."
 
-        except pymysql.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
+        except psycopg2.Error as err:
+                    print(f"Database error: {err}")
+                    response_text = "An error occurred while fetching data."
 
         finally:
             # Close the connection
@@ -116,21 +141,21 @@ def webhook():
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
 
-            query = "SELECT FName, LName FROM dummy_facultydata WHERE Gender = %s"
+            query = "SELECT fname, lname FROM dummy_facultydata WHERE gender = %s"
             cursor.execute(query, (gender,))
             result = cursor.fetchall()
 
             if result:
-                names = [f"{row['FName']} {row['LName']}" for row in result]
+                names = [f"{row['fname']} {row['lname']}" for row in result]
                 response_text = f"{gender} faculty members:\n" + "\n".join(names)
             else:
                 response_text = f"No {gender} faculty members found."
 
-        except pymysql.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
+        except psycopg2.Error as err:
+                    print(f"Database error: {err}")
+                    response_text = "An error occurred while fetching data."
 
         finally:
             # Close the connection
@@ -151,9 +176,9 @@ def webhook():
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
 
-            query = "SELECT * FROM dummy_facultydata WHERE CONCAT(FName, ' ', LName) = %s"
+            query = "SELECT * FROM dummy_facultydata WHERE CONCAT(fname, ' ', lname) = %s"
             cursor.execute(query, (person_name,))
             result = cursor.fetchone()
 
@@ -162,9 +187,9 @@ def webhook():
             else:
                 response_text = f"No details found for {person_name}."
 
-        except pymysql.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
+        except psycopg2.Error as err:
+                    print(f"Database error: {err}")
+                    response_text = "An error occurred while fetching data."
 
         finally:
             # Close the connection
@@ -185,21 +210,21 @@ def webhook():
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
 
-            query = "SELECT FName, LName FROM dummy_facultydata WHERE Degree = %s"
+            query = "SELECT fname, lname FROM dummy_facultydata WHERE degree = %s"
             cursor.execute(query, (degree_name,))
             result = cursor.fetchall()
 
             if result:
-                names = [f"{row['FName']} {row['LName']}" for row in result]
+                names = [f"{row['fname']} {row['lname']}" for row in result]
                 response_text = f"Faculty members with {degree_name}:\n" + "\n".join(names)
             else:
                 response_text = f"No faculty members found with {degree_name}."
 
-        except pymysql.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
+        except psycopg2.Error as err:
+                    print(f"Database error: {err}")
+                    response_text = "An error occurred while fetching data."
 
         finally:
             # Close the connection

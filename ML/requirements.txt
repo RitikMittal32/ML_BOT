@@ -2,8 +2,7 @@ Flask
 requests
 beautifulsoup4
 pandas
-pymysql
 openpyxl
 urllib3
 python-dotenv
-
+psycopg2-binary
