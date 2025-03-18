@@ -6,4 +6,3 @@ openpyxl
 urllib3
 python-dotenv
 psycopg2-binary
-time
