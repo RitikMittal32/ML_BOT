@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2.extras import DictCursor  # For dictionary-like results
 import urllib3
 import os
+import time
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -32,16 +33,19 @@ db_config = {
 app = Flask(__name__)
 
 # Database connection function
-def get_db_connection():
-    try:
-        # Attempt to connect to the database
-        conn = psycopg2.connect(**db_config)
-        print("Database connection successful!")
-        return conn
-    except psycopg2.Error as err:
-        # Handle connection errors
-        print(f"Error connecting to the database: {err}")
-        return None
+def get_db_connection(retries=4, delay=2):
+    for attempt in range(retries):
+        try:
+            conn = psycopg2.connect(**db_config)
+            print("Database connection successful!")
+            return conn
+        except psycopg2.Error as err:
+            print(f"Attempt {attempt + 1} failed: {err}")
+            if attempt < retries - 1:
+                time.sleep(delay)  # Wait before retrying
+            else:
+                print("Max retries reached. Failed to connect to the database.")
+                return None
 
 
 # # Check if the connection was successful
