@@ -8,6 +8,7 @@ import urllib3
 import os
 import time
 from dotenv import load_dotenv
+from psycopg2 import sql
 
 # Load environment variables from .env file
 load_dotenv()
@@ -98,114 +99,55 @@ def webhook():
 
     # Faculty Data Retrieval Intents
     elif intent == "GetPersonByField":
-        field_name = req.get('queryResult', {}).get('parameters', {}).get('fieldName', '')
+        field_name = req.get('queryResult', {}).get('parameters', {}).get('fieldName', '').strip()
         if not field_name:
             return jsonify({'fulfillmentText': "Please provide a field name to search for."})
 
-        # Connect to MySQL
         conn = get_db_connection()
         if not conn:
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
+            cursor = conn.cursor(cursor_factory=DictCursor)
+            query = sql.SQL("""
+                SELECT fname, lname, Field, similarity(Field, %s) AS sim
+                FROM dummy_facultydata
+                WHERE Field %% %s  -- Trigram fuzzy match operator
+                ORDER BY sim DESC
+                LIMIT 5
+            """)
+            cursor.execute(query, (field_name, field_name))
+            results = cursor.fetchall()
 
-            # Query the database
-            query = "SELECT fname, lname FROM dummy_facultydata WHERE Field = %s"
-            cursor.execute(query, (field_name,))
-            result = cursor.fetchall()
-
-            # Format the response
-            if result:
-                names = [f"{row['fname']} {row['lname']}" for row in result]
-                response_text = f"Faculty members in {field_name}:\n" + "\n".join(names)
+            if results:
+                # Filter results with similarity > 0.3
+                filtered = [row for row in results if row['sim'] > 0.3]
+                if filtered:
+                    top_match_field = filtered[0]['field']
+                    names = [f"{row['fname']} {row['lname']}" for row in filtered]
+                    response_text = (
+                        f"Did you mean '{top_match_field}'? "
+                        f"Faculty members:\n" + "\n".join(names)
+                    )
+                else:
+                    response_text = f"No relevant matches found for '{field_name}'."
             else:
-                response_text = f"No faculty members found in {field_name}."
+                response_text = f"No faculty members found in fields similar to '{field_name}'."
 
         except psycopg2.Error as err:
-                    print(f"Database error: {err}")
-                    response_text = "An error occurred while fetching data."
-
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
         finally:
-            # Close the connection
-            if 'cursor' in locals():
-                cursor.close()
-            if conn:
-                conn.close()
+            cursor.close()
+            conn.close()
 
         return jsonify({'fulfillmentText': response_text})
-    
-    elif intent == "GetFacultyByGender":
-        gender = req.get('queryResult', {}).get('parameters', {}).get('Gender', '')
-        if not gender:
-            return jsonify({'fulfillmentText': "Please provide a gender to search for."})
 
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
-
-            query = "SELECT fname, lname FROM dummy_facultydata WHERE gender = %s"
-            cursor.execute(query, (gender,))
-            result = cursor.fetchall()
-
-            if result:
-                names = [f"{row['fname']} {row['lname']}" for row in result]
-                response_text = f"{gender} faculty members:\n" + "\n".join(names)
-            else:
-                response_text = f"No {gender} faculty members found."
-
-        except psycopg2.Error as err:
-                    print(f"Database error: {err}")
-                    response_text = "An error occurred while fetching data."
-
-        finally:
-            # Close the connection
-            if 'cursor' in locals():
-                cursor.close()
-            if conn:
-                conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
-    
-    elif intent == "GetPersonDetails":
-        person_name = req.get('queryResult', {}).get('parameters', {}).get('PersonName', '')
-        if not person_name:
-            return jsonify({'fulfillmentText': "Please provide a faculty name to search for."})
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
-
-            query = "SELECT * FROM dummy_facultydata WHERE CONCAT(fname, ' ', lname) = %s"
-            cursor.execute(query, (person_name,))
-            result = cursor.fetchone()
-
-            if result:
-                response_text = f"Details for {person_name}:\n" + "\n".join([f"{key}: {value}" for key, value in result.items()])
-            else:
-                response_text = f"No details found for {person_name}."
-
-        except psycopg2.Error as err:
-                    print(f"Database error: {err}")
-                    response_text = "An error occurred while fetching data."
-
-        finally:
-            # Close the connection
-            if 'cursor' in locals():
-                cursor.close()
-            if conn:
-                conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
-    
+    # --------------------------------------------------------------------------
+    # Intent: GetPeopleByDegree (Fuzzy match for degrees like "Mster" -> "M.Sc.")
+    # --------------------------------------------------------------------------
     elif intent == "GetPeopleByDegree":
-        degree_name = req.get('queryResult', {}).get('parameters', {}).get('DegreeName', '')
+        degree_name = req.get('queryResult', {}).get('parameters', {}).get('DegreeName', '').strip()
         if not degree_name:
             return jsonify({'fulfillmentText': "Please provide a degree to search for."})
 
@@ -214,34 +156,117 @@ def webhook():
             return jsonify({'fulfillmentText': "Failed to connect to the database."})
 
         try:
-            cursor = conn.cursor(cursor_factory=DictCursor)  # Use DictCursor for dictionary results
+            cursor = conn.cursor(cursor_factory=DictCursor)
+            query = sql.SQL("""
+                SELECT fname, lname, degree, similarity(degree, %s) AS sim
+                FROM dummy_facultydata
+                WHERE degree %% %s
+                ORDER BY sim DESC
+                LIMIT 5
+            """)
+            cursor.execute(query, (degree_name, degree_name))
+            results = cursor.fetchall()
 
-            query = "SELECT fname, lname FROM dummy_facultydata WHERE degree = %s"
-            cursor.execute(query, (degree_name,))
-            result = cursor.fetchall()
-
-            if result:
-                names = [f"{row['fname']} {row['lname']}" for row in result]
-                response_text = f"Faculty members with {degree_name}:\n" + "\n".join(names)
+            if results:
+                filtered = [row for row in results if row['sim'] > 0.3]
+                if filtered:
+                    top_degree = filtered[0]['degree']
+                    names = [f"{row['fname']} {row['lname']}" for row in filtered]
+                    response_text = (
+                        f"Did you mean '{top_degree}'? "
+                        f"Faculty members:\n" + "\n".join(names)
+                    )
+                else:
+                    response_text = f"No relevant matches found for '{degree_name}'."
             else:
-                response_text = f"No faculty members found with {degree_name}."
+                response_text = f"No faculty members found with degrees similar to '{degree_name}'."
 
         except psycopg2.Error as err:
-                    print(f"Database error: {err}")
-                    response_text = "An error occurred while fetching data."
-
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
         finally:
-            # Close the connection
-            if 'cursor' in locals():
-                cursor.close()
-            if conn:
-                conn.close()
+            cursor.close()
+            conn.close()
 
         return jsonify({'fulfillmentText': response_text})
-        
+
+    # --------------------------------------------------------------------------
+    # Intent: GetPersonDetails (Fuzzy match for names like "Jhon Doe" -> "John Doe")
+    # --------------------------------------------------------------------------
+    elif intent == "GetPersonDetails":
+        person_name = req.get('queryResult', {}).get('parameters', {}).get('PersonName', '').strip()
+        if not person_name:
+            return jsonify({'fulfillmentText': "Please provide a faculty name to search for."})
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor(cursor_factory=DictCursor)
+            query = sql.SQL("""
+                SELECT *, similarity(CONCAT(fname, ' ', lname), %s) AS sim
+                FROM dummy_facultydata
+                WHERE CONCAT(fname, ' ', lname) %% %s
+                ORDER BY sim DESC
+                LIMIT 1
+            """)
+            cursor.execute(query, (person_name, person_name))
+            result = cursor.fetchone()
+
+            if result:
+                if result['sim'] > 0.4:  # Higher threshold for names
+                    details = "\n".join([f"{key}: {value}" for key, value in result.items()])
+                    response_text = f"Details for {result['fname']} {result['lname']}:\n{details}"
+                else:
+                    response_text = f"Did you mean {result['fname']} {result['lname']}? Please confirm."
+            else:
+                response_text = f"No faculty members found matching '{person_name}'."
+
+        except psycopg2.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+        finally:
+            cursor.close()
+            conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+
+    # --------------------------------------------------------------------------
+    # Intent: GetFacultyByGender (No fuzzy matching needed)
+    # --------------------------------------------------------------------------
+    elif intent == "GetFacultyByGender":
+        gender = req.get('queryResult', {}).get('parameters', {}).get('Gender', '').strip().lower()
+        if not gender:
+            return jsonify({'fulfillmentText': "Please provide a gender to search for."})
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'fulfillmentText': "Failed to connect to the database."})
+
+        try:
+            cursor = conn.cursor(cursor_factory=DictCursor)
+            query = "SELECT fname, lname FROM dummy_facultydata WHERE gender ILIKE %s"
+            cursor.execute(query, (gender,))
+            results = cursor.fetchall()
+
+            if results:
+                names = [f"{row['fname']} {row['lname']}" for row in results]
+                response_text = f"{gender.capitalize()} faculty members:\n" + "\n".join(names)
+            else:
+                response_text = f"No {gender} faculty members found."
+
+        except psycopg2.Error as err:
+            print(f"Database error: {err}")
+            response_text = "An error occurred while fetching data."
+        finally:
+            cursor.close()
+            conn.close()
+
+        return jsonify({'fulfillmentText': response_text})
+
     else:
-        print("Intent not recognized:", intent) 
-        return jsonify({'fulfillmentText': "Intent not recognized"})
+        return jsonify({'fulfillmentText': "Unhandled intent."})
 
 def scrape_library_website(book_title):
     # Replace spaces in the book title with '+' for URL encoding
