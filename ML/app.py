@@ -287,9 +287,54 @@ def scrape_library_website(book_title):
         # Check for single book result page
         single_book = soup.find("div", class_="record")
         if single_book:
+            # Extract title
             book_title = single_book.find("h1", class_="title").text.strip()
-            holds = soup.find('div', id='bib_holds').text.strip()
-            return f"'{book_title}' is available in library \n \n At present {holds}"
+            
+            # Extract author
+            author_tag = single_book.find("li", class_="author")
+            author = author_tag.text.strip() if author_tag else "Unknown Author"
+            
+            # Extract publication details
+            pub_tag = single_book.find("li", class_="publisher")
+            publication = pub_tag.text.strip() if pub_tag else "Unknown Publication"
+            
+            # Extract call number
+            call_number_tag = single_book.find("span", class_="call-number")
+            call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+            
+            # Extract availability/items
+            items_table = single_book.find("table", id="item-table")
+            availability_info = []
+            if items_table:
+                for row in items_table.find_all("tr")[1:]:  # Skip header row
+                    cols = row.find_all("td")
+                    if len(cols) >= 5:
+                        item_type = cols[1].text.strip()
+                        location = cols[2].text.strip()
+                        status = cols[4].text.strip()
+                        availability_info.append(f"{item_type} at {location}: {status}")
+            
+            # Extract holds information
+            holds_tag = soup.find('div', id='bib_holds')
+            holds = holds_tag.text.strip() if holds_tag else "No holds information available"
+            
+            # Format the complete response
+            response = (
+                f"Title: {book_title}\n"
+                f"Author: {author}\n"
+                f"Publication: {publication}\n"
+                f"Call Number: {call_number}\n\n"
+                f"Availability:\n"
+            )
+            
+            if availability_info:
+                response += "\n".join(availability_info) + "\n\n"
+            else:
+                response += "No availability information found\n\n"
+            
+            response += f"Holds Information: {holds}"
+            
+            return response
 
         # Find the table that contains the search results
         results_table = soup.find("table", class_="table table-striped")
