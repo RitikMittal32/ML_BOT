@@ -277,63 +277,76 @@ def scrape_library_website(book_title):
 
     try:
         response = requests.get(search_url, verify=False, timeout=10)
-        print("repsonse: ",response)
-
+        
         if response.status_code != 200:
             print(f"Failed to retrieve data, status code: {response.status_code}")
             return None
 
         soup = BeautifulSoup(response.content, "html.parser")
 
-        # Find the table that contains the search results
-        results_table = soup.find("table", class_="table table-striped")
-        single_book=soup.find("div",class_="record")
-
+        # Check for single book result page
+        single_book = soup.find("div", class_="record")
         if single_book:
-        # For a single book result
-            book_title=single_book.find("h1",class_="title").text.strip()
-            
-            
-
+            book_title = single_book.find("h1", class_="title").text.strip()
             holds = soup.find('div', id='bib_holds').text.strip()
-
             return f"'{book_title}' is available in library \n \n At present {holds}"
 
-
+        # Find the table that contains the search results
+        results_table = soup.find("table", class_="table table-striped")
+        
         if not results_table:
-            print("Could not find the search results table")
             return "No results found."
 
-        # Find all rows in the table
-        rows = results_table.find_all("tr")
-
+        # Find all rows in the table (skip header row if exists)
+        rows = results_table.find_all("tr")[1:]  # Skip header row
+        
         if not rows:
             return "No books found for this search."
 
-        # List to store book details
-        books_info = []
+        # Lists to store book details
+        exact_matches = []
+        partial_matches = []
+        all_titles = []
 
         # Loop through the rows and extract book details
         for row in rows:
             title_tag = row.find("a", class_="title")
-            author_tag = row.find("ul", class_="author")
-            availability_tag = row.find("span", class_="AvailabilityLabel")
-            call_number_tag = row.find("span", class_="CallNumber")
+            if not title_tag:
+                continue
+                
+            title = title_tag.get_text(strip=True)
+            all_titles.append(title)
+            
+            # Check for exact match (case insensitive)
+            if book_title.lower() == title.lower():
+                author_tag = row.find("ul", class_="author")
+                availability_tag = row.find("span", class_="AvailabilityLabel")
+                call_number_tag = row.find("span", class_="CallNumber")
 
-            title = title_tag.get_text(strip=True) if title_tag else "Unknown Title"
-            author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
-            availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
-            call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
+                author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
+                availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
+                call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
 
-            book_details = f"'{title}' by {author}. {availability} Call number: {call_number}."
-            books_info.append(book_details)
+                exact_matches.append(f"'{title}' by {author}. {availability} Call number: {call_number}.")
+            
+            # Check for partial match (substring)
+            elif book_title.lower() in title.lower():
+                partial_matches.append(title)
 
-            # Check if the requested book is available
-            if book_title.lower() in title.lower():
-                return book_details
-
-        # If no exact match, suggest alternatives
-        return f"The book is not available. Here are some alternatives:\n" + "\n".join(books_info[:5])
+        # Return exact match if found
+        if exact_matches:
+            return exact_matches[0]  # Return first exact match
+        
+        # If partial matches found, return them as options
+        if partial_matches:
+            return ("Multiple books found with similar titles. Here are the options:\n\n" + 
+                   "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+                   "\n\nPlease specify which book you're interested in.")
+        
+        # If no matches at all, return all titles found
+        return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
+               "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
+               "\n\nPlease specify which book you're interested in.")
     
     except Exception as e:
         print(f"Error in scraping library website: {e}")
