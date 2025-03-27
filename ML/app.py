@@ -412,16 +412,17 @@ def scrape_library_website(book_title):
             #        "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
             #        "\n\nPlease specify which book you're interested in.")
             return {
-                'fulfillmentText': ("Multiple books found with similar titles. Here are the options:\n\n" + 
-                                   "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
-                                   "\n\nPlease specify which book you're interested in."),
-                'followupEventInput': {
-                    'name': 'select_book',  # Follow-up event name
-                    # 'parameters': {
-                    #     'book_list': partial_matches  # Pass the partial matches list to follow-up
-                    # }
-                }
-            }
+            'fulfillmentText': (
+                "No exact or partial matches found. Here are all books in the search results:\n\n" + 
+                "\n".join(f"- {title}" for title in all_titles) +
+                "\n\nPlease reply with the exact title you want."
+            ),
+            'outputContexts': [{
+                'name': 'awaiting_book_selection',
+                'lifespanCount': 5
+                
+            }]
+        }
         
         # If no matches at all, return all titles found
         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
