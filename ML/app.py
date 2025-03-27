@@ -108,7 +108,7 @@ def webhook():
         latest_info = scrape_admission_details()
         response_text = latest_info if latest_info else "Not able to get required admission info"
         return jsonify({'fulfillmentText': response_text})
-    elif intent == "SearchLibraryBooks"||intent == "librarySearchBooks_selectBook":
+    elif intent == "SearchLibraryBooks"||intent == "selectBooks":
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
         print("book: ", book_title)
         if not book_title:
@@ -416,10 +416,10 @@ def scrape_library_website(book_title):
                                    "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
                                    "\n\nPlease specify which book you're interested in."),
                 'followupEventInput': {
-                    'name': 'librarySearchBooks_selectBook',  # Follow-up event name
-                    'parameters': {
-                        'book_list': partial_matches  # Pass the partial matches list to follow-up
-                    }
+                    'name': 'selectBooks',  # Follow-up event name
+                    # 'parameters': {
+                    #     'book_list': partial_matches  # Pass the partial matches list to follow-up
+                    # }
                 }
             }
         
