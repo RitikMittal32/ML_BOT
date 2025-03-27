@@ -108,7 +108,7 @@ def webhook():
         latest_info = scrape_admission_details()
         response_text = latest_info if latest_info else "Not able to get required admission info"
         return jsonify({'fulfillmentText': response_text})
-    elif intent == "SearchLibraryBooks":
+    elif intent == "SearchLibraryBooks"||intent == "librarySearchBooks_selectBook":
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
         print("book: ", book_title)
         if not book_title:
@@ -408,9 +408,20 @@ def scrape_library_website(book_title):
         
         # If partial matches found, return them as options
         if partial_matches:
-            return ("Multiple books found with similar titles. Here are the options:\n\n" + 
-                   "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
-                   "\n\nPlease specify which book you're interested in.")
+            # return ("Multiple books found with similar titles. Here are the options:\n\n" + 
+            #        "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+            #        "\n\nPlease specify which book you're interested in.")
+            return {
+                'fulfillmentText': ("Multiple books found with similar titles. Here are the options:\n\n" + 
+                                   "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+                                   "\n\nPlease specify which book you're interested in."),
+                'followupEventInput': {
+                    'name': 'librarySearchBooks_selectBook',  # Follow-up event name
+                    'parameters': {
+                        'book_list': partial_matches  # Pass the partial matches list to follow-up
+                    }
+                }
+            }
         
         # If no matches at all, return all titles found
         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
