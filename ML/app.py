@@ -366,9 +366,19 @@ def scrape_library_website(book_title):
 
         # If partial matches found, return them as options
         if partial_matches:
-            return ("Multiple books found with similar titles. Here are the options:\n\n" + 
+            responsetext = ("Multiple books found with similar titles. Here are the options:\n\n" + 
                     "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
                     "\n\nPlease specify which book you're interested in.")
+    
+            return jsonify({
+                'fulfillmentText': responsetext,  # Use responsetext instead of result
+                'followupEventInput': {
+                    'name': 'select_book',  # Replace with the actual follow-up event name
+                    'parameters': {
+                    'bookTitle': book_title  # You can pass additional parameters if needed
+                    }
+                }
+            })
 
         # If no matches at all, return all titles found
         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
