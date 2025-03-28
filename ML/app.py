@@ -366,41 +366,41 @@ def scrape_library_website(book_title):
 
                 exact_matches.append(f"'{title}' by {author}. {availability} Call number: {call_number}.")
 
-            # Check for partial match (substring)
-            elif book_title.lower() in title.lower():
-                partial_matches.append(title)
-
         # Return exact match if found
         if exact_matches:
             return exact_matches[0]  # Return first exact match
 
         # If partial matches found, return them as options
-
         if partial_matches:
-            responsetext = ("Multiple books found with similar titles. Here are the options:\n\n" + "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+            responsetext = ("Multiple books found with similar titles. Here are the options:\n\n" + 
+                    "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
                     "\n\nPlease specify the full name of the book you're interested in.")
 
-    # Returning a response with follow-up event
-            return jsonify({
+            # Create the response with follow-up event for Dialogflow
+            response = {
                 'fulfillmentText': responsetext,  # Prompt to ask the user for the full book name
                 'followupEventInput': {
-                'name': 'ask_for_full_book_name',  # The follow-up event name that triggers next action
-                'parameters': {
-                    'partial_matches': partial_matches
-                    # Pass partial matches to handle in the follow-up event if needed
+                    'name': 'ask_for_full_book_name',  # The follow-up event name that triggers next action
+                    'parameters': {
+                        'partial_matches': partial_matches  # Pass partial matches to handle in the follow-up event if needed
                     }
                 }
-            })
-
-
+            }
+            return response  # Return the response (not jsonify here)
+        
         # If no matches at all, return all titles found
-        return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
+        return {
+            'fulfillmentText': (
+                "No exact or partial matches found. Here are all books in the search results:\n\n" + 
                 "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
-                "\n\nPlease specify which book you're interested in.")
+                "\n\nPlease specify which book you're interested in."
+            )
+        }
     
     except Exception as e:
         print(f"Error in scraping library website: {e}")
         return None
+
 
 
 def search_specific_book(book_title):
