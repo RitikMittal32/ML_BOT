@@ -317,72 +317,69 @@ def scrape_library_website(book_title):
         if single_book:
             # Extract single book details
             return extract_single_book_details(single_book)
-        else:
-            return "got mulptiple books"
         
-        # Find the table that contains the search results for multiple books
+        # Find the table that contains the search results
         results_table = soup.find("table", class_="table table-striped")
-        
+ 
         if not results_table:
             return "No results found."
-        
-        # Find all rows in the table (skip header row)
+ 
+        # Find all rows in the table (skip header row if exists)
         rows = results_table.find_all("tr")[1:]  # Skip header row
-        
+ 
         if not rows:
             return "No books found for this search."
-
+ 
         # Lists to store book details
-        all_titles = []
         exact_matches = []
         partial_matches = []
-
+        all_titles = []
+ 
         # Loop through the rows and extract book details
         for row in rows:
             title_tag = row.find("a", class_="title")
             if not title_tag:
                 continue
-            
+
             title = title_tag.get_text(strip=True)
             all_titles.append(title)
-            
+
             # Check for exact match (case insensitive)
             if book_title.lower() == title.lower():
-                exact_matches.append(extract_book_row_details(row))
+                author_tag = row.find("ul", class_="author")
+                availability_tag = row.find("span", class_="AvailabilityLabel")
+                call_number_tag = row.find("span", class_="CallNumber")
+
+                author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
+                availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
+                call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
+
+                exact_matches.append(f"'{title}' by {author}. {availability} Call number: {call_number}.")
+
             # Check for partial match (substring)
             elif book_title.lower() in title.lower():
                 partial_matches.append(title)
 
         # Return exact match if found
         if exact_matches:
-            return exact_matches[0]  # Return the first exact match
+            return exact_matches[0]  # Return first exact match
 
-        # If partial matches are found, return them as options
+        # If partial matches found, return them as options
         if partial_matches:
-            return {
-                'fulfillmentText': (
-                    "Multiple books found with similar titles. Here are the options:\n\n" + 
+            return ("Multiple books found with similar titles. Here are the options:\n\n" + 
                     "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
-                    "\n\nPlease specify which book you're interested in."
-                ),
-                "followupEvent": {
-                    "name": "select_book"
-                }
-            }
+                    "\n\nPlease specify which book you're interested in.")
 
         # If no matches at all, return all titles found
-        return {
-            'fulfillmentText': (
-                "No exact or partial matches found. Here are all books in the search results:\n\n" + 
+        return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
                 "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
-                "\n\nPlease reply with the exact title you want."
-            )
-        }
-
+                "\n\nPlease specify which book you're interested in.")
+    
     except Exception as e:
         print(f"Error in scraping library website: {e}")
         return None
 
+ 
 
 def extract_single_book_details(single_book):
     """Extracts details from a single book result."""
