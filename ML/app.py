@@ -317,6 +317,7 @@ def scrape_library_website(book_title):
         if single_book:
             # Extract single book details
             return extract_single_book_details(single_book)
+        else return "got mulptiple books"
         
         # Find the table that contains the search results for multiple books
         results_table = soup.find("table", class_="table table-striped")
