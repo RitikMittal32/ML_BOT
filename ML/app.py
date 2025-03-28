@@ -371,8 +371,8 @@ def scrape_library_website(book_title):
                     "\n\nPlease specify which book you're interested in.")
     
             return jsonify({
-                'fulfillmentText': responsetext,  # Use responsetext instead of result
-                }
+                'fulfillmentText': responsetext  # Use responsetext instead of result
+                
             })
 
         # If no matches at all, return all titles found
