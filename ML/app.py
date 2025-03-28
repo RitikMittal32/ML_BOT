@@ -292,13 +292,17 @@ def webhook():
     else:
         return jsonify({'fulfillmentText': "Unhandled intent."})
 
+
+
+
+
 def scrape_library_website(book_title):
     # Replace spaces in the book title with '+' for URL encoding
     book_title_query = book_title.replace(" ", "+")
-
+    
     # The base URL of the library search (replace book title in the query)
     search_url = f"https://lnmiit-opac.kohacloud.in/cgi-bin/koha/opac-search.pl?idx=&limit=&q={book_title_query}&limit=&weight_search=1"
-
+    
     try:
         response = requests.get(search_url, verify=False, timeout=10)
         
@@ -308,130 +312,297 @@ def scrape_library_website(book_title):
 
         soup = BeautifulSoup(response.content, "html.parser")
 
-        # Check for single book result page
+        # Check for a single book result page
         single_book = soup.find("div", class_="record")
         if single_book:
-            # Extract title
-            book_title = single_book.find("h1", class_="title").text.strip()
-            
-            # Extract author
-            author_tag = single_book.find("li", class_="author")
-            author = author_tag.text.strip() if author_tag else "Unknown Author"
-            
-            # Extract publication details
-            pub_tag = single_book.find("li", class_="publisher")
-            publication = pub_tag.text.strip() if pub_tag else "Unknown Publication"
-            
-            # Extract call number
-            call_number_tag = single_book.find("span", class_="call-number")
-            call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
-            
-            # Extract availability/items
-            items_table = single_book.find("table", id="item-table")
-            availability_info = []
-            if items_table:
-                for row in items_table.find_all("tr")[1:]:  # Skip header row
-                    cols = row.find_all("td")
-                    if len(cols) >= 5:
-                        item_type = cols[1].text.strip()
-                        location = cols[2].text.strip()
-                        status = cols[4].text.strip()
-                        availability_info.append(f"{item_type} at {location}: {status}")
-            
-            # Extract holds information
-            holds_tag = soup.find('div', id='bib_holds')
-            holds = holds_tag.text.strip() if holds_tag else "No holds information available"
-            
-            # Format the complete response
-            response = (
-                f"Title: {book_title}\n"
-                f"Author: {author}\n"
-                f"Publication: {publication}\n"
-                f"Call Number: {call_number}\n\n"
-                f"Availability:\n"
-            )
-            
-            if availability_info:
-                response += "\n".join(availability_info) + "\n\n"
-            else:
-                response += "No availability information found\n\n"
-            
-            response += f"Holds Information: {holds}"
-            
-            return response
-
-        # Find the table that contains the search results
+            # Extract single book details
+            return extract_single_book_details(single_book)
+        
+        # Find the table that contains the search results for multiple books
         results_table = soup.find("table", class_="table table-striped")
         
         if not results_table:
             return "No results found."
-
-        # Find all rows in the table (skip header row if exists)
+        
+        # Find all rows in the table (skip header row)
         rows = results_table.find_all("tr")[1:]  # Skip header row
         
         if not rows:
             return "No books found for this search."
 
         # Lists to store book details
+        all_titles = []
         exact_matches = []
         partial_matches = []
-        all_titles = []
 
         # Loop through the rows and extract book details
         for row in rows:
             title_tag = row.find("a", class_="title")
             if not title_tag:
                 continue
-                
+            
             title = title_tag.get_text(strip=True)
             all_titles.append(title)
             
             # Check for exact match (case insensitive)
             if book_title.lower() == title.lower():
-                author_tag = row.find("ul", class_="author")
-                availability_tag = row.find("span", class_="AvailabilityLabel")
-                call_number_tag = row.find("span", class_="CallNumber")
-
-                author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
-                availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
-                call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
-
-                exact_matches.append(f"'{title}' by {author}. {availability} Call number: {call_number}.")
-            
+                exact_matches.append(extract_book_row_details(row))
             # Check for partial match (substring)
             elif book_title.lower() in title.lower():
                 partial_matches.append(title)
 
         # Return exact match if found
         if exact_matches:
-            return exact_matches[0]  # Return first exact match
-        
-        # If partial matches found, return them as options
+            return exact_matches[0]  # Return the first exact match
+
+        # If partial matches are found, return them as options
         if partial_matches:
-            # return ("Multiple books found with similar titles. Here are the options:\n\n" + 
-            #        "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
-            #        "\n\nPlease specify which book you're interested in.")
             return {
+                'fulfillmentText': (
+                    "Multiple books found with similar titles. Here are the options:\n\n" + 
+                    "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+                    "\n\nPlease specify which book you're interested in."
+                ),
+                "followupEvent": {
+                    "name": "select_book"
+                }
+            }
+
+        # If no matches at all, return all titles found
+        return {
             'fulfillmentText': (
                 "No exact or partial matches found. Here are all books in the search results:\n\n" + 
-                "\n".join(f"- {title}" for title in all_titles) +
+                "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
                 "\n\nPlease reply with the exact title you want."
-            ),
-            "followupEvent": {
-                "name": "select_book",
-               
-                
-            }
+            )
         }
-        
-        # If no matches at all, return all titles found
-        return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
-               "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
-               "\n\nPlease specify which book you're interested in.")
-    
+
     except Exception as e:
         print(f"Error in scraping library website: {e}")
         return None
+
+
+def extract_single_book_details(single_book):
+    """Extracts details from a single book result."""
+    book_title = single_book.find("h1", class_="title").text.strip()
+    
+    # Extract author
+    author_tag = single_book.find("li", class_="author")
+    author = author_tag.text.strip() if author_tag else "Unknown Author"
+    
+    # Extract publication details
+    pub_tag = single_book.find("li", class_="publisher")
+    publication = pub_tag.text.strip() if pub_tag else "Unknown Publication"
+    
+    # Extract call number
+    call_number_tag = single_book.find("span", class_="call-number")
+    call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+    
+    # Extract availability/items
+    items_table = single_book.find("table", id="item-table")
+    availability_info = []
+    if items_table:
+        for row in items_table.find_all("tr")[1:]:  # Skip header row
+            cols = row.find_all("td")
+            if len(cols) >= 5:
+                item_type = cols[1].text.strip()
+                location = cols[2].text.strip()
+                status = cols[4].text.strip()
+                availability_info.append(f"{item_type} at {location}: {status}")
+    
+    # Extract holds information
+    holds_tag = single_book.find('div', id='bib_holds')
+    holds = holds_tag.text.strip() if holds_tag else "No holds information available"
+    
+    # Format the response
+    response = (
+        f"Title: {book_title}\n"
+        f"Author: {author}\n"
+        f"Publication: {publication}\n"
+        f"Call Number: {call_number}\n\n"
+        f"Availability:\n"
+    )
+    
+    if availability_info:
+        response += "\n".join(availability_info) + "\n\n"
+    else:
+        response += "No availability information found\n\n"
+    
+    response += f"Holds Information: {holds}"
+    
+    return response
+
+
+def extract_book_row_details(row):
+    """Extracts details from a book result row."""
+    title_tag = row.find("a", class_="title")
+    title = title_tag.get_text(strip=True)
+    
+    # Extract author
+    author_tag = row.find("ul", class_="author")
+    author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
+    
+    # Extract availability
+    availability_tag = row.find("span", class_="AvailabilityLabel")
+    availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
+    
+    # Extract call number
+    call_number_tag = row.find("span", class_="CallNumber")
+    call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
+    
+    return f"'{title}' by {author}. {availability} Call number: {call_number}."
+
+
+
+
+
+
+
+
+
+
+
+
+# def scrape_library_website(book_title):
+#     # Replace spaces in the book title with '+' for URL encoding
+#     book_title_query = book_title.replace(" ", "+")
+
+#     # The base URL of the library search (replace book title in the query)
+#     search_url = f"https://lnmiit-opac.kohacloud.in/cgi-bin/koha/opac-search.pl?idx=&limit=&q={book_title_query}&limit=&weight_search=1"
+
+#     try:
+#         response = requests.get(search_url, verify=False, timeout=10)
+        
+#         if response.status_code != 200:
+#             print(f"Failed to retrieve data, status code: {response.status_code}")
+#             return None
+
+#         soup = BeautifulSoup(response.content, "html.parser")
+
+#         # Check for single book result page
+#         single_book = soup.find("div", class_="record")
+#         if single_book:
+#             # Extract title
+#             book_title = single_book.find("h1", class_="title").text.strip()
+            
+#             # Extract author
+#             author_tag = single_book.find("li", class_="author")
+#             author = author_tag.text.strip() if author_tag else "Unknown Author"
+            
+#             # Extract publication details
+#             pub_tag = single_book.find("li", class_="publisher")
+#             publication = pub_tag.text.strip() if pub_tag else "Unknown Publication"
+            
+#             # Extract call number
+#             call_number_tag = single_book.find("span", class_="call-number")
+#             call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+            
+#             # Extract availability/items
+#             items_table = single_book.find("table", id="item-table")
+#             availability_info = []
+#             if items_table:
+#                 for row in items_table.find_all("tr")[1:]:  # Skip header row
+#                     cols = row.find_all("td")
+#                     if len(cols) >= 5:
+#                         item_type = cols[1].text.strip()
+#                         location = cols[2].text.strip()
+#                         status = cols[4].text.strip()
+#                         availability_info.append(f"{item_type} at {location}: {status}")
+            
+#             # Extract holds information
+#             holds_tag = soup.find('div', id='bib_holds')
+#             holds = holds_tag.text.strip() if holds_tag else "No holds information available"
+            
+#             # Format the complete response
+#             response = (
+#                 f"Title: {book_title}\n"
+#                 f"Author: {author}\n"
+#                 f"Publication: {publication}\n"
+#                 f"Call Number: {call_number}\n\n"
+#                 f"Availability:\n"
+#             )
+            
+#             if availability_info:
+#                 response += "\n".join(availability_info) + "\n\n"
+#             else:
+#                 response += "No availability information found\n\n"
+            
+#             response += f"Holds Information: {holds}"
+            
+#             return response
+
+#         # Find the table that contains the search results
+#         results_table = soup.find("table", class_="table table-striped")
+        
+#         if not results_table:
+#             return "No results found."
+
+#         # Find all rows in the table (skip header row if exists)
+#         rows = results_table.find_all("tr")[1:]  # Skip header row
+        
+#         if not rows:
+#             return "No books found for this search."
+
+#         # Lists to store book details
+#         exact_matches = []
+#         partial_matches = []
+#         all_titles = []
+
+#         # Loop through the rows and extract book details
+#         for row in rows:
+#             title_tag = row.find("a", class_="title")
+#             if not title_tag:
+#                 continue
+                
+#             title = title_tag.get_text(strip=True)
+#             all_titles.append(title)
+            
+#             # Check for exact match (case insensitive)
+#             if book_title.lower() == title.lower():
+#                 author_tag = row.find("ul", class_="author")
+#                 availability_tag = row.find("span", class_="AvailabilityLabel")
+#                 call_number_tag = row.find("span", class_="CallNumber")
+
+#                 author = author_tag.get_text(strip=True) if author_tag else "Unknown Author"
+#                 availability = availability_tag.get_text(strip=True) if availability_tag else "Unknown Availability"
+#                 call_number = call_number_tag.get_text(strip=True) if call_number_tag else "Unknown Call Number"
+
+#                 exact_matches.append(f"'{title}' by {author}. {availability} Call number: {call_number}.")
+            
+#             # Check for partial match (substring)
+#             elif book_title.lower() in title.lower():
+#                 partial_matches.append(title)
+
+#         # Return exact match if found
+#         if exact_matches:
+#             return exact_matches[0]  # Return first exact match
+        
+#         # If partial matches found, return them as options
+#         if partial_matches:
+#             # return ("Multiple books found with similar titles. Here are the options:\n\n" + 
+#             #        "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+#             #        "\n\nPlease specify which book you're interested in.")
+#             return {
+#             'fulfillmentText': (
+#                 "No exact or partial matches found. Here are all books in the search results:\n\n" + 
+#                 "\n".join(f"- {title}" for title in all_titles) +
+#                 "\n\nPlease reply with the exact title you want."
+#             ),
+#             "followupEvent": {
+#                 "name": "select_book",
+               
+                
+#             }
+#         }
+        
+#         # If no matches at all, return all titles found
+#         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
+#                "\n".join(f"{i+1}. {title}" for i, title in enumerate(all_titles)) +
+#                "\n\nPlease specify which book you're interested in.")
+    
+#     except Exception as e:
+#         print(f"Error in scraping library website: {e}")
+#         return None
 
 
 
