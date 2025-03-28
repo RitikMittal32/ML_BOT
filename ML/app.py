@@ -117,6 +117,16 @@ def webhook():
         availability_info = scrape_library_website(book_title)
         response_text = availability_info if availability_info else "Sorry, I couldn't retrieve the book details."
         return jsonify({'fulfillmentText': response_text})
+
+    elif intent=="ask_for_full_book_name":
+        book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
+        print("book: ", book_title)
+        if not book_title:
+            return jsonify({'fulfillmentText': "Please provide a book title to search for."})
+
+        availability_info = search_specific_book(book_title)
+        response_text = availability_info if availability_info else "Sorry, I couldn't retrieve the book details."
+        return jsonify({'fulfillmentText': response_text})
     
     elif intent == "SearchPapers":
         return handle_search_papers_intent(req)
@@ -365,12 +375,23 @@ def scrape_library_website(book_title):
             return exact_matches[0]  # Return first exact match
 
         # If partial matches found, return them as options
+
         if partial_matches:
-            responsetext = ("Multiple books found with similar titles. Here are the options:\n\n" + 
-                    "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
-                    "\n\nPlease specify which book you're interested in.")
-    
-            return responsetext
+            responsetext = ("Multiple books found with similar titles. Here are the options:\n\n" + "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
+                    "\n\nPlease specify the full name of the book you're interested in.")
+
+    # Returning a response with follow-up event
+            return jsonify({
+                'fulfillmentText': responsetext,  # Prompt to ask the user for the full book name
+                'followupEventInput': {
+                'name': 'ask_for_full_book_name',  # The follow-up event name that triggers next action
+                'parameters': {
+                    'partial_matches': partial_matches
+                    # Pass partial matches to handle in the follow-up event if needed
+                    }
+                }
+            })
+
 
         # If no matches at all, return all titles found
         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
@@ -380,6 +401,31 @@ def scrape_library_website(book_title):
     except Exception as e:
         print(f"Error in scraping library website: {e}")
         return None
+
+
+def search_specific_book(book_title):
+    # Implement your logic to search the specific book based on the exact title
+    # Example:
+    search_url = f"https://lnmiit-opac.kohacloud.in/cgi-bin/koha/opac-search.pl?idx=&limit=&q={book_title.replace(' ', '+')}&limit=&weight_search=1"
+    
+    response = requests.get(search_url, verify=False, timeout=10)
+    if response.status_code != 200:
+        return jsonify({
+            'fulfillmentText': "Unable to fetch book details, please try again later."
+        })
+    
+    # Parse and return book details
+    soup = BeautifulSoup(response.content, "html.parser")
+    single_book = soup.find("div", class_="record")
+    if single_book:
+        book_details = extract_single_book_details(single_book)
+        return jsonify({
+            'fulfillmentText': book_details
+        })
+    else:
+        return jsonify({
+            'fulfillmentText': "No exact match found for the provided book title."
+        })
 
  
 
