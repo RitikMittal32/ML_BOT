@@ -419,13 +419,9 @@ def search_specific_book(book_title):
     single_book = soup.find("div", class_="record")
     if single_book:
         book_details = extract_single_book_details(single_book)
-        return jsonify({
-            'fulfillmentText': book_details
-        })
+        return book_details
     else:
-        return jsonify({
-            'fulfillmentText': "No exact match found for the provided book title."
-        })
+        return "no match found"
 
  
 
