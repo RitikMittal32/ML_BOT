@@ -417,11 +417,11 @@ def scrape_library_website(book_title):
                 "\n".join(f"- {title}" for title in all_titles) +
                 "\n\nPlease reply with the exact title you want."
             ),
-            'outputContexts': [{
-                'name': 'awaiting_book_selection',
-                'lifespanCount': 5
+            "followupEvent": {
+                "name": "select_book",
+               
                 
-            }]
+            }
         }
         
         # If no matches at all, return all titles found
