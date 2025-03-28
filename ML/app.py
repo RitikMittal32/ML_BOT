@@ -372,11 +372,6 @@ def scrape_library_website(book_title):
     
             return jsonify({
                 'fulfillmentText': responsetext,  # Use responsetext instead of result
-                'followupEventInput': {
-                    'name': 'select_book',  # Replace with the actual follow-up event name
-                    'parameters': {
-                    'bookTitle': book_title  # You can pass additional parameters if needed
-                    }
                 }
             })
 
