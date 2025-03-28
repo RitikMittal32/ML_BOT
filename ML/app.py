@@ -370,10 +370,7 @@ def scrape_library_website(book_title):
                     "\n".join(f"{i+1}. {title}" for i, title in enumerate(partial_matches)) +
                     "\n\nPlease specify which book you're interested in.")
     
-            return jsonify({
-                'fulfillmentText': "multiple found"  # Use responsetext instead of result
-                
-            })
+            return responsetext
 
         # If no matches at all, return all titles found
         return ("No exact or partial matches found. Here are all books in the search results:\n\n" + 
