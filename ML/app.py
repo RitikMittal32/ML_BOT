@@ -371,7 +371,7 @@ def scrape_library_website(book_title):
                     "\n\nPlease specify which book you're interested in.")
     
             return jsonify({
-                'fulfillmentText': responsetext  # Use responsetext instead of result
+                'fulfillmentText': "multiple found"  # Use responsetext instead of result
                 
             })
 
