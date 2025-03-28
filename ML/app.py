@@ -108,7 +108,7 @@ def webhook():
         latest_info = scrape_admission_details()
         response_text = latest_info if latest_info else "Not able to get required admission info"
         return jsonify({'fulfillmentText': response_text})
-    elif intent == "SearchLibraryBooks"||intent == "select_book":
+    elif intent == "SearchLibraryBooks" or intent == "select_book":
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
         print("book: ", book_title)
         if not book_title:
