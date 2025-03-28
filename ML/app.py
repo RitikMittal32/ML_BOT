@@ -426,35 +426,60 @@ def get_single_book_details(book_title):
         if not record:
             return "Book details not available"
 
-        # Extract all details
-        title = record.find("h1", class_="title").text.strip() if record.find("h1", class_="title") else "Unknown Title"
-        author = record.find("li", class_="author").text.strip() if record.find("li", class_="author") else "Unknown Author"
-        publication = record.find("li", class_="publisher").text.strip() if record.find("li", class_="publisher") else "Unknown"
-        call_number = record.find("span", class_="call-number").text.strip() if record.find("span", class_="call-number") else "Unknown"
-
-        # Process availability
-        availability = []
-        items_table = record.find("table", id="item-table")
-        if items_table:
-            for row in items_table.find_all("tr")[1:]:
-                cols = row.find_all("td")
-                if len(cols) >= 5:
-                    availability.append(
-                        f"{cols[1].text.strip()} at {cols[2].text.strip()}: {cols[4].text.strip()}"
-                    )
-
-        # Format the response
-        details = [
-            f"Title: {title}",
-            f"Author: {author}",
-            f"Publication: {publication}",
-            f"Call Number: {call_number}",
-            "\nAvailability:",
-            *(availability if availability else ["No availability information"]),
-            f"\nHolds: {soup.find('div', id='bib_holds').text.strip() if soup.find('div', id='bib_holds') else 'No holds info'}"
-        ]
-
-        return "\n".join(details)
+        try:
+            # Extract basic information
+            title = record.find("h1", class_="title").text.strip() if record.find("h1", class_="title") else "Unknown Title"
+            author_tag = record.find("span", property="name")
+            author = author_tag.text.strip() if author_tag else "Unknown Author"
+            
+            # Extract ISBN
+            isbn_tag = record.find("span", property="isbn")
+            isbn = isbn_tag.text.strip() if isbn_tag else "Unknown ISBN"
+            
+            # Extract publication details (not present in sample, keeping as fallback)
+            publication = "Unknown Publication"
+            
+            # Extract call number from holdings table
+            call_number_tag = soup.find("td", class_="call_no")
+            call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+            
+            # Extract availability information
+            availability = []
+            holdings_table = soup.find("table", id="holdingst")
+            if holdings_table:
+                for row in holdings_table.find_all("tr")[1:]:  # Skip header row
+                    cols = row.find_all("td")
+                    if len(cols) >= 7:  # Ensure we have all columns
+                        item_type = cols[0].text.strip()
+                        location = cols[1].text.strip()
+                        status = cols[3].text.strip()
+                        barcode = cols[5].text.strip()
+                        
+                        availability.append(
+                            f"{item_type} at {location} (Barcode: {barcode}): {status}"
+                        )
+            
+            # Extract holds information
+            holds_tag = soup.find("div", id="bib_holds")
+            holds = holds_tag.text.strip() if holds_tag else "No holds information"
+            
+            # Format the complete response
+            details = [
+                f"Title: {title}",
+                f"Author: {author}",
+                f"ISBN: {isbn}",
+                f"Publication: {publication}",
+                f"Call Number: {call_number}",
+                "\nAvailability:",
+                *(availability if availability else ["No availability information"]),
+                f"\nHolds Information: {holds}"
+            ]
+            
+            return "\n".join(details)
+            
+        except Exception as e:
+            print(f"Error extracting details: {str(e)}")
+            return "Could not retrieve complete book details"
 
     except Exception as e:
         print(f"Detail extraction error: {e}")
