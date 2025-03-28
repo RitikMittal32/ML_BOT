@@ -384,7 +384,7 @@ def scrape_library_website(book_title):
 
 def extract_single_book_details(single_book):
     """Extracts details from a single book result."""
-    book_title = single_book.find("h1", class_="title").text.strip()
+    book_title = single_book.find("h1", class_="title").text.strip()+"\nballe balle"
     
     # Extract author
     author_tag = single_book.find("li", class_="author")
