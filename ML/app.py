@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from psycopg2 import sql
 from urllib.parse import urljoin
 import logging
-
+import urllib.parse
 
 
 
