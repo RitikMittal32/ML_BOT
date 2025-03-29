@@ -349,7 +349,32 @@ def get_book_list(book_title):
     - List of matching books if multiple found
     - Error message if none found
     """
-    book_title_query = book_title.replace(" ", "+")
+        # First clean the title
+    cleaned_title = book_title.strip()
+    
+    # Replace specific punctuation that might affect searches
+    replacements = {
+        ',': '%2C',
+        "'": '%27',
+        '"': '%22',
+        '!': '%21',
+        '?': '%3F',
+        ':': '%3A',
+        ';': '%3B',
+        '(': '%28',
+        ')': '%29',
+        '&': '%26'
+    }
+    
+    # Apply replacements
+    for char, code in replacements.items():
+        cleaned_title = cleaned_title.replace(char, code)
+    
+    # Replace spaces with +
+    book_title_query = cleaned_title.replace(' ', '+')
+    
+    # Final URL encoding for any remaining special characters
+    book_title_query = urllib.parse.quote_plus(book_title_query)
     search_url = f"https://lnmiit-opac.kohacloud.in/cgi-bin/koha/opac-search.pl?idx=&limit=&q={book_title_query}&limit=&weight_search=1"
 
     try:
@@ -412,7 +437,32 @@ def get_single_book_details(book_title):
     For FOLLOW-UP INTENT - Extracts detailed information about a specific book
     Returns formatted string with complete book details
     """
-    book_title_query = book_title.replace(" ", "+")
+    # First clean the title
+    cleaned_title = book_title.strip()
+    
+    # Replace specific punctuation that might affect searches
+    replacements = {
+        ',': '%2C',
+        "'": '%27',
+        '"': '%22',
+        '!': '%21',
+        '?': '%3F',
+        ':': '%3A',
+        ';': '%3B',
+        '(': '%28',
+        ')': '%29',
+        '&': '%26'
+    }
+    
+    # Apply replacements
+    for char, code in replacements.items():
+        cleaned_title = cleaned_title.replace(char, code)
+    
+    # Replace spaces with +
+    book_title_query = cleaned_title.replace(' ', '+')
+    
+    # Final URL encoding for any remaining special characters
+    book_title_query = urllib.parse.quote_plus(book_title_query)
     search_url = f"https://lnmiit-opac.kohacloud.in/cgi-bin/koha/opac-search.pl?idx=&limit=&q={book_title_query}&limit=&weight_search=1"
 
     try:
