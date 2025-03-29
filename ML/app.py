@@ -122,22 +122,30 @@ def webhook():
         if "Title:" in result:  # Single book case
             return jsonify({
                 'fulfillmentText': result,
-                'outputContexts': []  # Clear any existing contexts
+                'outputContexts': [
+                    # Explicitly close the followup context
+                    {
+                        'name': f"{session}/contexts/SearchLibraryBooks-followup",
+                        'lifespanCount': 0  # This closes the context
+                    },
+                    {
+                        'name': f"{session}/contexts/awaiting_selection",
+                        'lifespanCount': 0  # Also close this if it exists
+                    }
+                ]
             })
         else:  # Multiple books case
             return jsonify({
                 'fulfillmentText': result,
                 'outputContexts': [{
-                    # Use full context path including session
                     'name': f"{session}/contexts/awaiting_selection",
-                    'lifespanCount': 3,
+                    'lifespanCount': 1,  
                     'parameters': {
                         'original_query': book_title,
                         'search_results': result
                     }
                 }]
             })
-        
 
     elif intent == "SelectBookFromList":
         # Get user's choice (e.g., "1", "first", or exact title)
