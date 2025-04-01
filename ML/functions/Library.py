@@ -48,7 +48,7 @@ def get_book_list(book_title):
         # First check for single book result
         single_book = soup.find("div", class_="record")
         if single_book:
-            return get_single_book_details(book_title)  # Delegate to single book handler
+            return get_book_info(soup)  # Delegate to single book handler
 
         # Process multiple books case
         results_table = soup.find("table", class_="table table-striped")
@@ -132,67 +132,8 @@ def get_single_book_details(book_title):
         response = requests.get(search_url, verify=False, timeout=10)
         if response.status_code != 200:
             return f"Error: Failed to access library catalog (Status {response.status_code})"
-
         soup = BeautifulSoup(response.content, "html.parser")
-       
-        record = soup.find("div", class_="record")
-        if not record:
-            return "Book details not available"
-
-        try:
-            # Extract basic information
-            title = record.find("h1", class_="title").text.strip() if record.find("h1", class_="title") else "Unknown Title"
-            author_tag = record.find("span", property="name")
-            author = author_tag.text.strip() if author_tag else "Unknown Author"
-            
-            # Extract ISBN
-            isbn_tag = record.find("span", property="isbn")
-            isbn = isbn_tag.text.strip() if isbn_tag else "Unknown ISBN"
-            
-            # Extract publication details (not present in sample, keeping as fallback)
-            publication = "Unknown Publication"
-            
-            # Extract call number from holdings table
-            call_number_tag = soup.find("td", class_="call_no")
-            call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
-            
-            # Extract availability information
-            availability = []
-            holdings_table = soup.find("table", id="holdingst")
-            if holdings_table:
-                for row in holdings_table.find_all("tr")[1:]:  # Skip header row
-                    cols = row.find_all("td")
-                    if len(cols) >= 7:  # Ensure we have all columns
-                        item_type = cols[0].text.strip()
-                        location = cols[1].text.strip()
-                        status = cols[3].text.strip()
-                        barcode = cols[5].text.strip()
-                        
-                        availability.append(
-                            f"{item_type} at {location} (Barcode: {barcode}): {status}"
-                        )
-            
-            # Extract holds information
-            holds_tag = soup.find("div", id="bib_holds")
-            holds = holds_tag.text.strip() if holds_tag else "No holds information"
-            
-            # Format the complete response
-            details = [
-                f"Title: {title}",
-                f"Author: {author}",
-                f"ISBN: {isbn}",
-                f"Publication: {publication}",
-                f"Call Number: {call_number}",
-                "\nAvailability:",
-                *(availability if availability else ["No availability information"]),
-                f"\nHolds Information: {holds}"
-            ]
-            
-            return "\n".join(details)
-            
-        except Exception as e:
-            print(f"Error extracting details: {str(e)}")
-            return "Could not retrieve complete book details"
+        return get_book_info(soup)
 
     except Exception as e:
         print(f"Detail extraction error: {e}")
@@ -213,68 +154,80 @@ def get_single_book_bibilo(book_title, biblo_num):
             return f"Error: Failed to access library catalog (Status {response.status_code})"
 
         soup = BeautifulSoup(response.content, "html.parser")
-       
-        record = soup.find("div", class_="record")
-        if not record:
-            return "Book details not available"
-
-        try:
-            # Extract basic information
-            title = record.find("h1", class_="title").text.strip() if record.find("h1", class_="title") else "Unknown Title"
-            author_tag = record.find("span", property="name")
-            author = author_tag.text.strip() if author_tag else "Unknown Author"
-            
-            # Extract ISBN
-            isbn_tag = record.find("span", property="isbn")
-            isbn = isbn_tag.text.strip() if isbn_tag else "Unknown ISBN"
-            
-            # Extract publication details (not present in sample, keeping as fallback)
-            publication = "Unknown Publication"
-            
-            # Extract call number from holdings table
-            call_number_tag = soup.find("td", class_="call_no")
-            call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
-            
-            # Extract availability information
-            availability = []
-            holdings_table = soup.find("table", id="holdingst")
-            if holdings_table:
-                for row in holdings_table.find_all("tr")[1:]:  # Skip header row
-                    cols = row.find_all("td")
-                    if len(cols) >= 7:  # Ensure we have all columns
-                        item_type = cols[0].text.strip()
-                        location = cols[1].text.strip()
-                        status = cols[3].text.strip()
-                        barcode = cols[5].text.strip()
-                        
-                        availability.append(
-                            f"{item_type} at {location} (Barcode: {barcode}): {status}"
-                        )
-            
-            # Extract holds information
-            holds_tag = soup.find("div", id="bib_holds")
-            holds = holds_tag.text.strip() if holds_tag else "No holds information"
-            
-            # Format the complete response
-            details = [
-                f"Title: {title}",
-                f"Author: {author}",
-                f"ISBN: {isbn}",
-                f"Publication: {publication}",
-                f"Call Number: {call_number}",
-                "\nAvailability:",
-                *(availability if availability else ["No availability information"]),
-                f"\nHolds Information: {holds}"
-            ]
-            
-            return "\n".join(details)
-            
-        except Exception as e:
-            print(f"Error extracting details: {str(e)}")
-            return "Could not retrieve complete book details"
+        return get_book_info(soup)
 
     except Exception as e:
         print(f"Detail extraction error: {e}")
+        return "Could not retrieve complete book details"
+    
+
+def get_book_info(soup):
+    """
+    Extracts book details from a BeautifulSoup object and returns formatted information.
+    
+    Args:
+        soup (BeautifulSoup): BeautifulSoup object containing the book details page
+    
+    Returns:
+        str: Formatted string containing book details or error message
+    """
+    record = soup.find("div", class_="record")
+    if not record:
+        return "Book details not available"
+
+    try:
+        # Extract basic information
+        title = record.find("h1", class_="title").text.strip() if record.find("h1", class_="title") else "Unknown Title"
+        author_tag = record.find("span", property="name")
+        author = author_tag.text.strip() if author_tag else "Unknown Author"
+        
+        # Extract ISBN
+        isbn_tag = record.find("span", property="isbn")
+        isbn = isbn_tag.text.strip() if isbn_tag else "Unknown ISBN"
+        
+        # Extract publication details (not present in sample, keeping as fallback)
+        publication = "Unknown Publication"
+        
+        # Extract call number from holdings table
+        call_number_tag = soup.find("td", class_="call_no")
+        call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+        
+        # Extract availability information
+        availability = []
+        holdings_table = soup.find("table", id="holdingst")
+        if holdings_table:
+            for row in holdings_table.find_all("tr")[1:]:  # Skip header row
+                cols = row.find_all("td")
+                if len(cols) >= 7:  # Ensure we have all columns
+                    item_type = cols[0].text.strip()
+                    location = cols[1].text.strip()
+                    status = cols[3].text.strip()
+                    barcode = cols[5].text.strip()
+                    
+                    availability.append(
+                        f"{item_type} at {location} (Barcode: {barcode}): {status}"
+                    )
+        
+        # Extract holds information
+        holds_tag = soup.find("div", id="bib_holds")
+        holds = holds_tag.text.strip() if holds_tag else "No holds information"
+        
+        # Format the complete response
+        details = [
+            f"Title: {title}",
+            f"Author: {author}",
+            f"ISBN: {isbn}",
+            f"Publication: {publication}",
+            f"Call Number: {call_number}",
+            "\nAvailability:",
+            *(availability if availability else ["No availability information"]),
+            f"\nHolds Information: {holds}"
+        ]
+        
+        return "\n".join(details)
+        
+    except Exception as e:
+        print(f"Error extracting details: {str(e)}")
         return "Could not retrieve complete book details"
 
 def format_book_list(books, header):
