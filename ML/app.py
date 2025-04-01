@@ -4,7 +4,7 @@ from psycopg2.extras import DictCursor
 from psycopg2 import sql
 from functions.Admission import scrape_admission_details
 from functions.CollegeWebsite import scrape_college_website
-from functions.Library import get_single_book_details, get_book_list
+from functions.Library import get_single_book_details, get_book_list, get_single_book_bibilo
 from functions.Papers import handle_search_papers_intent
 from config.database import get_db_connection
 
@@ -35,47 +35,74 @@ def webhook():
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
         if not book_title:
             return jsonify({'fulfillmentText': "Please provide a book title to search for."})
-        
+
         # Get the session from the request
         session = req.get('session', '')
-        
+
         # Call your book search function
         result = get_book_list(book_title)
-        
-        if "Title:" in result:  # Single book case
-            return jsonify({
-                'fulfillmentText': result,
-                'outputContexts': [
-                    # Explicitly close the followup context
-                    {
-                        'name': f"{session}/contexts/SearchLibraryBooks-followup",
-                        'lifespanCount': 0  # This closes the context
-                    },
-                    {
-                        'name': f"{session}/contexts/awaiting_selection",
-                        'lifespanCount': 0  # Also close this if it exists
-                    }
-                ]
-            })
-        else:  # Multiple books case
-            return jsonify({
-                'fulfillmentText': result,
-                'outputContexts': [{
+
+        # Prepare base response structure
+        response = {
+            'fulfillmentText': result,
+            'outputContexts': [
+                {
+                    'name': f"{session}/contexts/SearchLibraryBooks-followup",
+                    'lifespanCount': 0  # Always close followup context by default
+                },
+                {
                     'name': f"{session}/contexts/awaiting_selection",
-                    'lifespanCount': 1,  
+                    'lifespanCount': 0  # Close selection context by default
+                }
+            ]
+        }
+
+        # Handle different result cases
+        if "Title:" in result:  # Single book case
+            # Keep the default response (contexts closed)
+            pass
+        elif any(no_result_msg in result for no_result_msg in [
+            "No matching books found",
+            "No books found", 
+            "No books found matching your search",
+            "The search returned no results",
+            "No results found"
+        ]): 
+            # Keep contexts closed (default)
+            pass
+        else:  # Multiple books case
+            response['outputContexts'] = [
+                {
+                    'name': f"{session}/contexts/awaiting_selection",
+                    'lifespanCount': 1,  # Keep context open for selection
                     'parameters': {
                         'original_query': book_title,
                         'search_results': result
                     }
-                }]
-            })
+                },
+                {
+                    'name': f"{session}/contexts/SearchLibraryBooks-followup", 
+                    'lifespanCount': 1  # Keep followup context open
+                }
+            ]
+
+        return jsonify(response)
 
     elif intent == "SelectBookFromList":
-        # Get user's choice (e.g., "1", "first", or exact title)
-        book_choice = req.get('queryResult', {}).get('parameters', {}).get('book_choice', '')
+        parameters = req.get('queryResult', {}).get('parameters', {})
+        book_choice = parameters.get('book_choice', '')
+        biblo_choice = parameters.get('biblo_choice', '')
         
-        details = get_single_book_details(book_choice)
-        return {"fulfillmentText": details}
+        if book_choice and not biblo_choice:
+            # User selected by book title/number only
+            details = get_single_book_details(book_choice)
+            return {"fulfillmentText": details}
+        elif biblo_choice:
+            # User included biblionumber (handle as needed)
+            details = get_single_book_bibilo(book_choice, biblo_choice)
+            return {"fulfillmentText": details}
+        else:
+            return jsonify({'fulfillmentText': "Please provide a book title to search for."})
 
     elif intent == "SearchPapers":
         return handle_search_papers_intent(req)
