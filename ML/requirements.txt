@@ -6,3 +6,4 @@ openpyxl
 urllib3
 python-dotenv
 psycopg2-binary
+fuzzywuzzy

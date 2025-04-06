@@ -3,7 +3,7 @@ import psycopg2
 from psycopg2.extras import DictCursor 
 from psycopg2 import sql
 from functions.Admission import scrape_admission_details
-from functions.CollegeWebsite import scrape_college_website
+from functions.Events import scrape_college_website
 from functions.Library import get_single_book_details, get_book_list, get_single_book_bibilo
 from functions.Papers import handle_search_papers_intent
 from config.database import get_db_connection
@@ -27,22 +27,18 @@ def webhook():
         latest_info = scrape_college_website()
         response_text = latest_info if latest_info else "Sorry, I couldn't retrieve the announcement."
         return jsonify({'fulfillmentText': response_text})
+    
     elif intent == "AdmissionDetails":
         latest_info = scrape_admission_details()
         response_text = latest_info if latest_info else "Not able to get required admission info"
         return jsonify({'fulfillmentText': response_text})
+    
     elif intent == "SearchLibraryBooks":
         book_title = req.get('queryResult', {}).get('parameters', {}).get('book_title', '')
         if not book_title:
             return jsonify({'fulfillmentText': "Please provide a book title to search for."})
-
-        # Get the session from the request
         session = req.get('session', '')
-
-        # Call your book search function
         result = get_book_list(book_title)
-
-        # Prepare base response structure
         response = {
             'fulfillmentText': result,
             'outputContexts': [
@@ -56,10 +52,7 @@ def webhook():
                 }
             ]
         }
-
-        # Handle different result cases
         if "Title:" in result:  # Single book case
-            # Keep the default response (contexts closed)
             pass
         elif any(no_result_msg in result for no_result_msg in [
             "No matching books found",
@@ -68,7 +61,6 @@ def webhook():
             "The search returned no results",
             "No results found"
         ]): 
-            # Keep contexts closed (default)
             pass
         else:  # Multiple books case
             response['outputContexts'] = [
@@ -85,7 +77,6 @@ def webhook():
                     'lifespanCount': 1  # Keep followup context open
                 }
             ]
-
         return jsonify(response)
 
     elif intent == "SelectBookFromList":
@@ -106,6 +97,28 @@ def webhook():
 
     elif intent == "SearchPapers":
         return handle_search_papers_intent(req)
+        
+
+    elif intent == "AdmissionData":
+        parameters = req.get('queryResult', {}).get('parameters', {})
+        admission_choice = parameters.get('admission_choice', '').strip()
+
+        session = req.get('session', '')
+        if admission_choice:
+            details = scrape_college_website(admission_choice)
+            return {"fulfillmentText": details}
+        elif admission_choice.lower() == 'exit':
+            return {
+                "fulfillmentText": "Exiting admission information. Type 'Admission Info' to start again.",
+                "outputContexts": [
+                    {
+                        "name": f"{request['session']}/contexts/AdmissionDetails-followup",
+                        "lifespanCount": 0
+                    }
+                ]
+            }
+        else:
+            return jsonify({'fulfillmentText': "Please provide admission choice to search for."})
         
     # Faculty Data Retrieval Intents
     elif intent == "GetPersonByField":
