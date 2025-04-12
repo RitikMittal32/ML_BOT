@@ -43,129 +43,146 @@ def safe_find_next(parent, element_type=None, **kwargs):
         return parent.find_next(element_type, **kwargs)
     except:
         return None
-
+    
 def extract_scholarships_assistantships(soup):
-    scholarship_data = {
-        "Introduction": "",
-        "Scholarships": {},
-        "Assistantships": {},
-        "External_Scholarships": []
-    }
-
+    output = ["SCHOLARSHIPS & ASSISTANTSHIPS", "===========================", ""]
+    
     # 1. Introduction Section
     intro_container = safe_find(soup, 'div', attrs={'data-id': '762364c'})
     if intro_container:
         intro_text = safe_find(intro_container, 'p')
         if intro_text:
-            scholarship_data["Introduction"] = intro_text.get_text(strip=True)
+            output.append(intro_text.get_text(strip=True))
+            output.append("")
 
     # 2. Scholarships (A- Scholarships)
     scholarships_container = safe_find(soup, 'div', attrs={'data-id': '164823b'})
     if scholarships_container:
         tabs = safe_find(scholarships_container, 'div', class_='e-n-tabs-content')
         if tabs:
-            scholarship_types = safe_find_all(tabs, 'div', class_='e-n-tab-content')
-            for tab in scholarship_types:
-                title = safe_find(tab, 'h3')
-                if title:
-                    title_text = title.get_text(strip=True).replace(':', '')
-                    content = {
-                        "description": "",
-                        "eligibility": {},
-                        "amount": ""
-                    }
-                    
-                    # Extract description
-                    description = safe_find(tab, 'p')
-                    if description:
-                        content["description"] = description.get_text(strip=True)
-                    
+            output.append("SCHOLARSHIPS")
+            output.append("-----------")
+            
+            scholarships_content = safe_find(soup, 'div', class_='e-n-tabs-content')
+            if scholarships_content:
+                # Find all tab panels - these have IDs starting with 'e-n-tab-content-'
+                scholarship_tabs = safe_find_all(scholarships_content, 'div', id=lambda x: x and x.startswith('e-n-tab-content-'))
+                
+                for tab in scholarship_tabs:
+                    title = safe_find(tab, 'h3')
+                    if title:
+                        title_text = title.get_text(strip=True).replace(':', '')
+                        output.append(f"\n{title_text}:")
+                        output.append("-" * (len(title_text) + 1))
+                        
+                        # Extract description
+                        description = safe_find(tab, 'p')
+                        if description:
+                            output.append(f"\n{description.get_text(strip=True)}")
+                        else:
+                            output.append(f"Err description {description}")
                     # Extract eligibility criteria
                     h4_tags = safe_find_all(tab, 'h4')
-                    for h4 in h4_tags:
-                        section = h4.get_text(strip=True).replace(':', '')
-                        next_p = h4.find_next('p')
-                        next_ul = h4.find_next('ul')
-                        
-                        if next_p and (not next_ul or next_p.find_next() == next_ul):
-                            content["eligibility"][section] = next_p.get_text(strip=True)
-                        if next_ul:
-                            content["eligibility"][section] = [
-                                li.get_text(strip=True) for li in safe_find_all(next_ul, 'li')
-                            ]
+                    if h4_tags:
+                        output.append("\nEligibility Criteria:")
+                        for h4 in h4_tags:
+                            section = h4.get_text(strip=True).replace(':', '')
+                            next_p = h4.find_next('p')
+                            next_ul = h4.find_next('ul')
+                            
+                            if next_p and (not next_ul or next_p.find_next() == next_ul):
+                                output.append(f"  • {section}: {next_p.get_text(strip=True)}")
+                            if next_ul:
+                                output.append(f"  • {section}:")
+                                for li in safe_find_all(next_ul, 'li'):
+                                    output.append(f"    - {li.get_text(strip=True)}")
+                    else:
+                        output.append(f"Err h4_tags {h4_tags}")
                     
                     # Extract amount if mentioned in description
-                    if "amount" in content["description"].lower():
-                        amount = content["description"].split("amount is")[-1].split(".")[0].strip()
-                        content["amount"] = amount
+                    if description and "amount" in description.get_text().lower():
+                        amount = description.get_text().split("amount is")[-1].split(".")[0].strip()
+                        output.append(f"\nAmount: ₹{amount}")
+                    else:
+                        output.append(f"Err amount")
                     
-                    scholarship_data["Scholarships"][title_text] = content
+                    output.append("")  # Empty line between scholarships
+            else:
+                output.append(f"Err scholarships_title {scholarships_content}")
+        else:
+             output.append(f"Err scholarships_tabs {tabs}")
+    else:
+        output.append(f"Err scholarships_container {scholarships_container}")
 
     # 3. Assistantships (B- Assistantships)
     assistantships_container = safe_find(soup, 'div', attrs={'data-id': '3b0ea85'})
     if assistantships_container:
         tabs = safe_find(assistantships_container, 'div', class_='e-n-tabs-content')
         if tabs:
-            assistantship_types = safe_find_all(tabs, 'div', class_='e-n-tab-content')
+            output.append("\nASSISTANTSHIPS")
+            output.append("-------------")
+            
+            assistantship_types = safe_find_all(tabs, 'div', id=lambda x: x and x.startswith('e-n-tab-content-'))
             for tab in assistantship_types:
                 title = safe_find(tab, 'h3')
                 if title:
                     title_text = title.get_text(strip=True).replace(':', '')
-                    content = {
-                        "description": "",
-                        "eligibility": {},
-                        "amount": "",
-                        "conditions": []
-                    }
+                    output.append(f"\n{title_text}:")
+                    output.append("-" * (len(title_text) + 1))
                     
-                    # Extract description and amount
-                    paragraphs = safe_find_all(tab, 'p')
-                    if paragraphs:
-                        content["description"] = paragraphs[0].get_text(strip=True)
-                        if "amount" in content["description"].lower():
-                            amount = content["description"].split("amount is")[-1].split(".")[0].strip()
-                            content["amount"] = amount
+                    # Extract description
+                    description = safe_find(tab, 'p')
+                    if description:
+                        output.append(f"\n{description.get_text(strip=True)}")
+                        if "amount" in description.get_text().lower():
+                            amount = description.get_text().split("amount is")[-1].split(".")[0].strip()
+                            output.append(f"\nAmount: ₹{amount}")
                     
                     # Extract eligibility and conditions
                     h4_tags = safe_find_all(tab, 'h4')
-                    for h4 in h4_tags:
-                        section = h4.get_text(strip=True).replace(':', '')
-                        next_p = h4.find_next('p')
-                        next_ul = h4.find_next('ul')
-                        
-                        if next_p and (not next_ul or next_p.find_next() == next_ul):
-                            content["eligibility"][section] = next_p.get_text(strip=True)
-                        if next_ul:
-                            items = [li.get_text(strip=True) for li in safe_find_all(next_ul, 'li')]
-                            if "condition" in section.lower() or "note" in section.lower():
-                                content["conditions"].extend(items)
-                            else:
-                                content["eligibility"][section] = items
+                    if h4_tags:
+                        output.append("\nEligibility Criteria:")
+                        for h4 in h4_tags:
+                            section = h4.get_text(strip=True).replace(':', '')
+                            next_p = h4.find_next('p')
+                            next_ul = h4.find_next('ul')
+                            
+                            if next_p and (not next_ul or next_p.find_next() == next_ul):
+                                if "condition" in section.lower() or "note" in section.lower():
+                                    output.append("\nConditions:")
+                                    output.append(f"  • {next_p.get_text(strip=True)}")
+                                else:
+                                    output.append(f"  • {section}: {next_p.get_text(strip=True)}")
+                            
+                            if next_ul:
+                                items = [li.get_text(strip=True) for li in safe_find_all(next_ul, 'li')]
+                                if "condition" in section.lower() or "note" in section.lower():
+                                    output.append("\nConditions:")
+                                    for item in items:
+                                        output.append(f"  • {item}")
+                                else:
+                                    output.append(f"  • {section}:")
+                                    for item in items:
+                                        output.append(f"    - {item}")
                     
-                    # Extract any additional notes
-                    notes = safe_find(tab, 'ul', class_='genul')
-                    if notes:
-                        content["conditions"].extend(
-                            [li.get_text(strip=True) for li in safe_find_all(notes, 'li')]
-                        )
-                    
-                    scholarship_data["Assistantships"][title_text] = content
+                    output.append("")  # Empty line between assistantships
 
     # 4. External Scholarships
     external_container = safe_find(soup, 'div', attrs={'data-id': '8e58516'})
     if external_container:
         table = safe_find(external_container, 'table', class_='table-bordered')
         if table:
+            output.append("\nEXTERNAL SCHOLARSHIPS")
+            output.append("--------------------")
+            
             rows = safe_find_all(table, 'tr')
             for row in rows:
                 cols = safe_find_all(row, 'td')
                 if cols and len(cols) >= 2:
-                    scholarship_data["External_Scholarships"].append({
-                        "name": cols[0].get_text(strip=True),
-                        "provider": cols[1].get_text(strip=True)
-                    })
+                    output.append(f"\n• {cols[0].get_text(strip=True)} (Provider: {cols[1].get_text(strip=True)})")
 
-    return scholarship_data
+    
+    return "\n".join(output)
 
 def extract_table_data(table):
     """Extract data from a table into a list of dictionaries"""
@@ -207,6 +224,7 @@ def extract_important_dates(soup):
             output.append(row)
         elif isinstance(row, (list, tuple)) and len(row) >= 2:
             output.append(f"{row[0]}: {row[1]}")
+    
     
     return "\n".join(output)
 
@@ -314,112 +332,131 @@ def extract_counseling_process(soup):
     items = [li.get_text(strip=True).replace('\xa0', ' ') for li in safe_find_all(counseling_list, 'li')]
     return "Counseling Process:\n\n" + "\n".join(f"• {item}" for item in items)
 
-def extract_fee_structure(soup):    
-    fee_container = safe_find(soup, 'div', attrs={'data-id': '7445779'})
-    if not fee_container:
-        return "Fee Structure section not found"
-    
-    fee_widget = safe_find(fee_container, 'div', class_='elementor-widget-text-editor')
-    if not fee_widget:
-        return "Fee Structure content not found"
-    
-    output = ["Fee Structure:", "---------------"]
-    
-    # Extract B.Tech Programme fees
-    btech_header = safe_find(fee_widget, 'p', string=lambda t: 'B.Tech Programme' in t)
-    if btech_header:
-        btech_table = safe_find_next(btech_header, 'table')
-        if btech_table:
-            output.append("\nB.Tech Programme (per semester):")
-            current_main_item = None
-            
-            for row in safe_find_all(btech_table, 'tr'):
+def extract_fee_structure(soup):
+    # Find the fee structure container using the safe functions
+    try:
+        fee_container = safe_find(soup, 'div', attrs={'data-id': '7445779'})
+        if not fee_container:
+            return "Fee Structure section not found"
+        
+        fee_widget = safe_find(fee_container, 'div', class_='elementor-widget-container')
+        if not fee_widget:
+            return "Fee Structure content not found"
+        
+        def find_header(widget, phrase):
+            for p in safe_find_all(widget, 'p'):
+                text = p.get_text(strip=True).lower()
+                if phrase.lower() in text:
+                    return p
+            return None
+        
+        output = ["FEE STRUCTURE", "==============", ""]
+        
+        # Helper function to extract table data
+        def extract_table(table):
+            rows = []
+            for row in safe_find_all(table, 'tr'):
                 cells = safe_find_all(row, 'td')
-                if len(cells) == 3:
-                    code = cells[0].get_text(strip=True)
-                    desc = cells[1].get_text(strip=True)
-                    amount = cells[2].get_text(strip=True)
-                    
-                    if code and desc and amount:
-                        if code in ['A', 'B']:  # Main items
+                if cells:
+                    rows.append([cell.get_text(strip=True) for cell in cells])
+            return rows
+        
+        # Extract B.Tech Programme fees
+        btech_header = find_header(fee_widget, "B.Tech Programme")
+        if btech_header:
+            btech_table = safe_find_next(btech_header, 'table')
+            if btech_table:
+                output.append("B.TECH PROGRAMME (PER SEMESTER)")
+                output.append("-------------------------------")
+                
+                current_main_item = None
+                for row in extract_table(btech_table):
+                    if len(row) == 3:
+                        code, desc, amount = row
+                        if code in ['A', 'B']:
                             current_main_item = f"{code}. {desc}"
-                            output.append(f"  {current_main_item}: ₹{amount}" if amount.strip() else f"  {current_main_item}")
-                        else:  # Sub-items
-                            if 'ul' in str(cells[1]):  # Has bullet points
-                                bullet_items = [li.get_text(strip=True) for li in safe_find_all(cells[1], 'li')]
-                                for item in bullet_items:
-                                    output.append(f"    • {item}: ₹{amount}")
-                            else:
-                                output.append(f"    • {desc}: ₹{amount}")
-                    elif code == '' and desc == '' and amount:  # Total row
-                        output.append(f"    • Total: ₹{amount}")
-
-    # Extract B.Sc - M.Sc Programme fees
-    bsc_header = safe_find(fee_widget, 'p', string=lambda t: 'B.Sc – M.Sc' in t)
-    if bsc_header:
-        bsc_table = safe_find_next(bsc_header, 'table')
-        if bsc_table:
-            output.append("\nB.Sc - M.Sc Programme (per semester):")
-            current_main_item = None
-            
-            for row in safe_find_all(bsc_table, 'tr'):
-                cells = safe_find_all(row, 'td')
-                if len(cells) == 3:
-                    code = cells[0].get_text(strip=True)
-                    desc = cells[1].get_text(strip=True)
-                    amount = cells[2].get_text(strip=True)
-                    
-                    if code and desc and amount:
-                        if code in ['A', 'B']:  # Main items
-                            current_main_item = f"{code}. {desc}"
-                            output.append(f"  {current_main_item}: ₹{amount}" if amount.strip() else f"  {current_main_item}")
-                        else:  # Sub-items
-                            if 'ul' in str(cells[1]):  # Has bullet points
-                                bullet_items = [li.get_text(strip=True) for li in safe_find_all(cells[1], 'li')]
-                                for item in bullet_items:
-                                    output.append(f"    • {item}: ₹{amount}")
-                            else:
-                                output.append(f"    • {desc}: ₹{amount}")
-                    elif code == '' and desc == '' and amount:  # Total row
-                        output.append(f"    • Total: ₹{amount}")
-
-    # Extract Hostel and Mess charges
-    hostel_header = safe_find(fee_widget, 'p', string=lambda t: 'Hostel and Mess' in t)
-    if hostel_header:
-        hostel_table = safe_find_next(hostel_header, 'table')
-        if hostel_table:
-            output.append("\nHostel and Mess Charges (per semester):")
-            for row in safe_find_all(hostel_table, 'tr'):
-                cells = safe_find_all(row, 'td')
-                if len(cells) == 2:
-                    desc = cells[0].get_text(strip=True)
-                    amount = cells[1].get_text(strip=True)
-                    if desc and amount:
-                        if "TOTAL" in desc:
-                            output.append(f"  {desc}: ₹{amount}")
+                            output.append(f"\n{current_main_item}: ₹{amount}" if amount else f"\n{current_main_item}")
                         else:
-                            output.append(f"  • {desc}: ₹{amount}")
+                            if desc.startswith('•'):
+                                output.append(f"  {desc}: ₹{amount}")
+                            else:
+                                output.append(f"  • {desc}: ₹{amount}")
+                    elif len(row) == 3 and not row[0] and not row[1]:
+                        output.append(f"  • Total: ₹{row[2]}")
+        else:
+            output.append(f"Err {btech_header}")
+        
+        # Extract B.Sc - M.Sc Programme fees (similar structure as B.Tech)
+        bsc_header = find_header(fee_widget, "B.Sc – M.Sc")
+        if bsc_header:
+            bsc_table = safe_find_next(bsc_header, 'table')
+            if bsc_table:
+                output.append("\nB.SC - M.SC PROGRAMME (PER SEMESTER)")
+                output.append("------------------------------------")
+                
+                current_main_item = None
+                for row in extract_table(bsc_table):
+                    if len(row) == 3:
+                        code, desc, amount = row
+                        if code in ['A', 'B']:
+                            current_main_item = f"{code}. {desc}"
+                            output.append(f"\n{current_main_item}: ₹{amount}" if amount else f"\n{current_main_item}")
+                        else:
+                            if desc.startswith('•'):
+                                output.append(f"  {desc}: ₹{amount}")
+                            else:
+                                output.append(f"  • {desc}: ₹{amount}")
+                    elif len(row) == 3 and not row[0] and not row[1]:
+                        output.append(f"  • Total: ₹{row[2]}")
+        else:
+            output.append(f"Err {bsc_header}")
+        
+        # Extract Hostel and Mess charges
+        hostel_header = find_header(fee_widget, "Hostel and Mess")
+        if hostel_header:
+            hostel_table = safe_find_next(hostel_header, 'table')
+            if hostel_table:
+                output.append("\nHOSTEL AND MESS CHARGES (PER SEMESTER)")
+                output.append("---------------------------------------")
+                
+                for row in extract_table(hostel_table):
+                    if len(row) == 2:
+                        desc, amount = row
+                        if desc and amount:
+                            if "TOTAL" in desc:
+                                output.append(f"{desc}: {amount}")
+                            else:
+                                output.append(f"• {desc}: {amount}")
+                
+                # Extract hostel-specific notes that appear right after the table
+                next_p = safe_find_next(hostel_table, 'p')
+                if next_p and '**' in next_p.get_text():
+                    output.append(f"\nNote: {next_p.get_text(strip=True).replace('**', '')}")
+        
+        # Extract all general notes and disclaimers
+        notes_section = safe_find(fee_widget, string='NOTE:')
+        if notes_section:
+            notes_list = safe_find_next(notes_section, 'ul')
+            if notes_list:
+                output.append("\nIMPORTANT NOTES")
+                output.append("---------------")
+                
+                for li in safe_find_all(notes_list, 'li'):
+                    main_text = li.get_text(strip=True)
+                    nested_ul = safe_find(li, 'ul')
+                    if nested_ul:
+                        output.append(f"• {main_text}")
+                        for nested_li in safe_find_all(nested_ul, 'li'):
+                            output.append(f"  ◦ {nested_li.get_text(strip=True)}")
+                    else:
+                        output.append(f"• {main_text}")
+        
+            
+            return "\n".join(output)
     
-    # Extract notes
-    notes = []
-    note_paragraphs = safe_find_all(fee_widget, 'p')
-    for p in note_paragraphs:
-        text = p.get_text(strip=True)
-        if '**' in text or 'NOTE:' in text:
-            notes.append(text.replace('**', '').strip())
-    
-    note_items = [li.get_text(strip=True) for li in safe_find_all(fee_widget, 'li')]
-    notes.extend(note_items)
-    
-    if notes:
-        output.append("\nNotes:")
-        for note in notes:
-            if note.startswith("•"):
-                output.append(f"  {note}")
-            else:
-                output.append(f"  • {note}")
-    
-    return "\n".join(output)
+    except Exception as e:
+        return f"Error occurred: {str(e)}"
+
 
 def extract_refund_policy(soup):
     refund_container = safe_find(soup, 'div', attrs={'data-id': 'e7628df'})
@@ -475,7 +512,7 @@ def format_admission_sections(admission_data, header=None):
             "Available Admission Information Sections:\n\n" +
             "\n".join(f"• {section}" for section in admission_data.keys()) +
             "\n\nPlease specify which section you want (e.g. 'Important Dates')" +
-            "\n\nType 'exit' to cancel."
+            "\n\nType 'exit info' to cancel."
         )
 
 
@@ -526,7 +563,7 @@ def scrape_admission_details(user_title=None):
                     f"No matching section found for '{user_title}'.\n\n" +
                     "Available sections:\n" +
                     "\n".join(f"• {section}" for section in available) +
-                    "\n\nPlease try again or type 'exit' to cancel."
+                    "\n\nPlease try again or type 'exit info' to cancel."
                 )
         else:
             # If no title is provided, run all extraction functions

@@ -98,19 +98,20 @@ def webhook():
         admission_choice = parameters.get('admission_choice', '').strip()
 
         session = req.get('session', '')
-        if admission_choice:
-            details = scrape_admission_details(admission_choice)
-            return {"fulfillmentText": details}
-        elif admission_choice.lower() == 'exit':
+        
+        if admission_choice.lower() == 'exit info':
             return {
                 "fulfillmentText": "Exiting admission information. Type 'Admission Info' to start again.",
                 "outputContexts": [
                     {
-                        "name": f"{request['session']}/contexts/AdmissionDetails-followup",
+                        "name": f"{session}/contexts/AdmissionDetails-followup",
                         "lifespanCount": 0
                     }
                 ]
             }
+        elif admission_choice:
+            details = scrape_admission_details(admission_choice)
+            return {"fulfillmentText": details}
         else:
             return jsonify({'fulfillmentText': "Please provide admission choice to search for."})
         
