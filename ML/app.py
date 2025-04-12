@@ -281,6 +281,25 @@ def webhook():
             conn.close()
 
         return jsonify({'fulfillmentText': response_text})
+    
+    elif intent == "Complaint - custom":
+        complaint = req.get('queryResult', {}).get('parameters', {}).get('complaint_text', '')
+        print(complaint)
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cursor:
+                    insert_query = """
+                    INSERT INTO complaint (complaint) 
+                    VALUES (%s);
+                    """
+                    cursor.execute(insert_query, (complaint,))
+                    conn.commit()
+                    return jsonify({'fulfillmentText': "Message saved successfully!"})
+            except psycopg2.Error as e:
+                return jsonify({'fulfillmentText': str(e)})  # Convert exception to string
+            finally:
+                conn.close()
 
     else:
         return jsonify({'fulfillmentText': "Unhandled intent."})
