@@ -483,7 +483,8 @@ def extract_fee_structure(soup):
 
         # with open('Fee.txt', 'w', encoding='utf-8') as f:
         #     f.write("\n".join(output)) 
-        # return "\n".join(output)
+                                   
+        return "\n".join(output)
     
     except Exception as e:
         return f"Error occurred: {str(e)}"
