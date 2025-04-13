@@ -5,6 +5,7 @@ import json
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 from fuzzywuzzy import fuzz
+from data.getScholarshipdata import get_scholarship_data
 
 # Disable SSL warnings (not recommended for production)
 urllib3.disable_warnings(InsecureRequestWarning)
@@ -44,7 +45,7 @@ def safe_find_next(parent, element_type=None, **kwargs):
     except:
         return None
     
-def extract_scholarships_assistantships(soup):
+def extract_scholarships_assistantship(soup):
     output = ["SCHOLARSHIPS & ASSISTANTSHIPS", "===========================", ""]
     
     # 1. Introduction Section
@@ -182,7 +183,15 @@ def extract_scholarships_assistantships(soup):
                     output.append(f"\n• {cols[0].get_text(strip=True)} (Provider: {cols[1].get_text(strip=True)})")
 
     
+    # with open('scholarship.txt', 'w', encoding='utf-8') as f:
+    #     f.write("\n".join(output))
+
     return "\n".join(output)
+
+def extract_scholarships_assistantships(soup):
+    """Returns raw scholarship data exactly as provided by get_scholarship_data()"""
+    return get_scholarship_data()
+
 
 def extract_table_data(table):
     """Extract data from a table into a list of dictionaries"""
@@ -225,7 +234,8 @@ def extract_important_dates(soup):
         elif isinstance(row, (list, tuple)) and len(row) >= 2:
             output.append(f"{row[0]}: {row[1]}")
     
-    
+    # with open('Important_Dates.txt', 'w', encoding='utf-8') as f:
+    #     f.write("\n".join(output))
     return "\n".join(output)
 
 def extract_programmes_offered(soup):
@@ -268,6 +278,9 @@ def extract_programmes_offered(soup):
         output.append("\nNotes:")
         output.extend(f"• {note}" for note in notes_items)
     
+    # with open('Notes.txt', 'w', encoding='utf-8') as f:
+    #     f.write("\n".join(output))
+    
     return "\n".join(output) if output else "No programme information found"
 
 def extract_eligibility_criteria(soup):
@@ -281,6 +294,10 @@ def extract_eligibility_criteria(soup):
     if not eligibility_list:
         return "Eligibility Criteria list not found"
     items = [li.get_text(strip=True) for li in safe_find_all(eligibility_list, 'li')]
+
+    # with open('Eligibility.txt', 'w', encoding='utf-8') as f:
+    #     f.write("Eligibility Criteria:\n\n" + "\n".join(f"• {item}" for item in items))
+
     return "Eligibility Criteria:\n\n" + "\n".join(f"• {item}" for item in items)
 
 def extract_instructions_to_apply(soup):
@@ -294,6 +311,10 @@ def extract_instructions_to_apply(soup):
     if not instructions_list:
         return "Instructions to Apply list not found"
     items = [li.get_text(strip=True) for li in safe_find_all(instructions_list, 'li')]
+
+    # with open('Instructions.txt', 'w', encoding='utf-8') as f:
+    #     f.write("Instructions to Apply:\n\n" + "\n".join(f"• {item}" for item in items))
+
     return "Instructions to Apply:\n\n" + "\n".join(f"• {item}" for item in items)
 
 def extract_merit_list_preparation(soup):
@@ -317,6 +338,10 @@ def extract_merit_list_preparation(soup):
                 output.append(f"  - {nested_li.get_text(strip=True)}")
         else:
             output.append(f"• {item}")
+    
+    # with open('Merit.txt', 'w', encoding='utf-8') as f:
+    #     f.write("\n".join(output))
+
     return "\n".join(output)
 
 def extract_counseling_process(soup):
@@ -330,6 +355,10 @@ def extract_counseling_process(soup):
     if not counseling_list:
         return "Counseling Process list not found"
     items = [li.get_text(strip=True).replace('\xa0', ' ') for li in safe_find_all(counseling_list, 'li')]
+
+    # with open('Counseling.txt', 'w', encoding='utf-8') as f:
+    #     f.write("Counseling Process:\n\n" + "\n".join(f"• {item}" for item in items))
+
     return "Counseling Process:\n\n" + "\n".join(f"• {item}" for item in items)
 
 def extract_fee_structure(soup):
@@ -451,8 +480,10 @@ def extract_fee_structure(soup):
                     else:
                         output.append(f"• {main_text}")
         
-            
-            return "\n".join(output)
+
+        # with open('Fee.txt', 'w', encoding='utf-8') as f:
+        #     f.write("\n".join(output)) 
+        # return "\n".join(output)
     
     except Exception as e:
         return f"Error occurred: {str(e)}"
@@ -465,6 +496,10 @@ def extract_refund_policy(soup):
     refund_button = safe_find(refund_container, 'a', class_='elementor-button-link')
     if not refund_button:
         return "Refund Policy link not found"
+    
+    # with open('Refund.txt', 'w', encoding='utf-8') as f:
+    #     f.write(f"Refund Policy:\n\n• {refund_button.get_text(strip=True)}\n• Link: {refund_button['href']}")
+
     return f"Refund Policy:\n\n• {refund_button.get_text(strip=True)}\n• Link: {refund_button['href']}"
 
 def extract_contact_information(soup):
@@ -490,6 +525,9 @@ def extract_contact_information(soup):
     if len(output) == 1:  # Only header was added
         return "No contact information found"
     
+    # with open('contact.txt', 'w', encoding='utf-8') as f:
+    #     f.write("\n".join(output)) 
+
     return "\n".join(output)
 
 
