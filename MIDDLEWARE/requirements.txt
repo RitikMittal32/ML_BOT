@@ -1,0 +1,8 @@
+Flask
+sentence-transformers
+scikit-learn
+google-generativeai
+pinecone-client
+google-cloud-dialogflow
+uuid
+python-dotenv
