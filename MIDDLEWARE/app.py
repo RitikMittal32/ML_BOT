@@ -155,7 +155,7 @@ def query_bot():
             
         elif(predicted_intent=="faculty_data"):
             refined_query=user_message
-            response=search(user_message)
+            response=search(user_message,model)
             return jsonify({
                 "reply":response
             })

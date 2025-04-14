@@ -15,16 +15,15 @@ genai.configure(api_key=GenAI_API_KEY)
 pc = Pinecone(api_key=Pinecone_API_KEY)
 
 # Load HuggingFace model
-#model = SentenceTransformer('all-mpnet-base-v2')
+# model = SentenceTransformer('all-mpnet-base-v2')
 
 # --- Setup ---
 
-model = SentenceTransformer('BAAI/bge-small-en')
 INDEX_NAME = "faculty-info"
 index = pc.Index(INDEX_NAME)
 
 # --- Search Function ---
-def search(query):
+def search(query,model):
     # 1. Embed the query
     query_embedding = model.encode([query])[0]
 
