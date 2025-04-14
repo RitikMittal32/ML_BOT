@@ -2,7 +2,9 @@ Flask
 sentence-transformers
 scikit-learn
 google-generativeai
-pinecone-client
+pinecone
 google-cloud-dialogflow
 uuid
 python-dotenv
+huggingface-hub
+gunicorn
