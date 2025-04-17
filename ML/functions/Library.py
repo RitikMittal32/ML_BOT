@@ -82,15 +82,10 @@ def get_book_list(book_title):
 
         if not books:
             return "No matching books found."
-
-        # Format response based on match type
-        exact_matches = [b for b in books if book_title.lower() == b['title'].lower()]
-        if exact_matches:
-            return format_book_list(exact_matches, "Exact matches found")
             
         partial_matches = [b for b in books if book_title.lower() in b['title'].lower()]
         if partial_matches:
-            return format_book_list(partial_matches, "Partial matches found")
+            return format_book_list(partial_matches, "Matches found:")
             
         return format_book_list(books, "All books in search results")
 
@@ -196,18 +191,27 @@ def get_book_info(soup):
         availability = []
         holdings_table = soup.find("table", id="holdingst")
         if holdings_table:
+            availability = []
+            any_available = False  # Flag to track if any book is available
+            
             for row in holdings_table.find_all("tr")[1:]:  # Skip header row
                 cols = row.find_all("td")
                 if len(cols) >= 7:  # Ensure we have all columns
-                    item_type = cols[0].text.strip()
-                    location = cols[1].text.strip()
-                    status = cols[3].text.strip()
-                    barcode = cols[5].text.strip()
+                    status_cell = cols[3]  # Status column
                     
-                    availability.append(
-                        f"{item_type} at {location} (Barcode: {barcode}): {status}"
-                    )
-        
+                    # Check for available status in two ways:
+                    # 1. Look for <span class="item-status available">
+                    # 2. Look for <link property="availability" href="http://schema.org/InStock">
+                    available_span = status_cell.find('span', class_='item-status available')
+                    in_stock_link = status_cell.find('link', {'property': 'availability', 'href': 'http://schema.org/InStock'})
+                    
+                   if available_span and "Available" in available_span.get_text(strip=True):
+                        any_available = True
+                        break
+            
+            # Final availability status
+            availability_status = "Available" if any_available else "Not available"
+            availability.append(availability_status)
         # Extract holds information
         holds_tag = soup.find("div", id="bib_holds")
         holds = holds_tag.text.strip() if holds_tag else "No holds information"
