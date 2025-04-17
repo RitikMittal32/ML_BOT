@@ -205,7 +205,7 @@ def get_book_info(soup):
                     available_span = status_cell.find('span', class_='item-status available')
                     in_stock_link = status_cell.find('link', {'property': 'availability', 'href': 'http://schema.org/InStock'})
                     
-                   if available_span and "Available" in available_span.get_text(strip=True):
+                    if available_span and "Available" in available_span.get_text(strip=True):
                         any_available = True
                         break
             
