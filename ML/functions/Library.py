@@ -14,7 +14,8 @@ def get_book_list(book_title):
     - Error message if none found
     """
         # First clean the title
-    cleaned_title = book_title.strip()
+    cleaned_title = book_title[0].strip() if isinstance(book_title, list) else book_title.strip()
+
     
     # Replace specific punctuation that might affect searches
     replacements = {
