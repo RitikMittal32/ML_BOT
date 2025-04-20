@@ -8,11 +8,12 @@ import uuid
 from dotenv import load_dotenv
 import google.generativeai as genai
 import json
+from flask_cors import CORS
 
 
 # Setup
 app = Flask(__name__)
-
+CORS(app)
 load_dotenv()
 
 Service_Type = os.getenv("Service_Type")
@@ -109,14 +110,12 @@ def detect_intent_texts(project_id, session_id, text, language_code, contexts=No
     session_client = dialogflow.SessionsClient()
     session = session_client.session_path(project_id, session_id)
 
-   
 
     text_input = dialogflow.TextInput(text=text, language_code=language_code)
     query_input = dialogflow.QueryInput(text=text_input)
 
     # Add contexts if provided
     if contexts:
-        
         response = session_client.detect_intent(
             request={"session": session, "query_input": query_input}
         )
@@ -140,12 +139,10 @@ def query_bot():
     user_message = data.get('query')
     session_id = data.get('session_id')   
     project_id = "lnmiit-449207"
-    
     # 1. Classify intent
     predicted_intent = classify_intent(user_message)
     # 2. Get previous contexts if any
     previous_contexts = session_contexts.get(session_id, [])
-
     # 3. Refine query if needed
     if(previous_contexts):
         refined_query = user_message
@@ -182,4 +179,4 @@ def query_bot():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=port)

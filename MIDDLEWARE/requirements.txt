@@ -8,3 +8,4 @@ uuid
 python-dotenv
 huggingface-hub
 gunicorn
+flask_cors

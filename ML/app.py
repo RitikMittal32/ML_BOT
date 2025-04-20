@@ -13,14 +13,36 @@ from config.database import get_db_connection
 
 app = Flask(__name__)
 
+def get_display_info(session_id):
+    display_name = session_id.split('_')[1] if 'session_' in session_id else 'unknown'
+    display_name = display_name.upper()
+
+ 
+    role = display_name
+    for keyword in ["BH1", "BH2", "BH3", "BH4", "BH5"]:
+        if keyword in display_name:
+            return display_name, keyword
+        
+    for keyword in ["CHIEF WARDEN", "CW", "WARDEN"]:
+        if keyword in display_name:
+            return display_name, "warden"
+    
+        # Typical roll number like 22UEC111
+        
+
+    return display_name, role
 
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     req = request.get_json(silent=True, force=True)
-    
+    session_full = req.get('session', '')  # Full session string
+    print(session_full)
+    session_id = session_full.split('/')[-1]  # Extract just the ID
+    display_name = session_id.split('_')[1] if 'session_' in session_id else 'unknown'
+    display_name, role = get_display_info(session_id)
+    print(display_name, role)
     print("Request:", req)
-
     intent = req.get('queryResult', {}).get('intent', {}).get('displayName', '')
     
     if intent == "GetLatestAnnouncement":
@@ -114,196 +136,102 @@ def webhook():
             return {"fulfillmentText": details}
         else:
             return jsonify({'fulfillmentText': "Please provide admission choice to search for."})
-        
-    # Faculty Data Retrieval Intents
-    elif intent == "GetPersonByField":
-        field_name = req.get('queryResult', {}).get('parameters', {}).get('fieldName', '').strip()
-        if not field_name:
-            return jsonify({'fulfillmentText': "Please provide a field name to search for."})
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)
-            query = sql.SQL("""
-                SELECT fname, lname, Field, similarity(Field, %s) AS sim
-                FROM dummy_facultydata
-                WHERE Field %% %s  -- Trigram fuzzy match operator
-                ORDER BY sim DESC
-                LIMIT 5
-            """)
-            cursor.execute(query, (field_name, field_name))
-            results = cursor.fetchall()
-
-            if results:
-                # Filter results with similarity > 0.3
-                filtered = [row for row in results if row['sim'] > 0.3]
-                if filtered:
-                    top_match_field = filtered[0]['field']
-                    names = [f"{row['fname']} {row['lname']}" for row in filtered]
-                    response_text = (
-                        f"Did you mean '{top_match_field}'? "
-                        f"Faculty members:\n" + "\n".join(names)
-                    )
-                else:
-                    response_text = f"No relevant matches found for '{field_name}'."
-            else:
-                response_text = f"No faculty members found in fields similar to '{field_name}'."
-
-        except psycopg2.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
-        finally:
-            cursor.close()
-            conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
-
-    # --------------------------------------------------------------------------
-    # Intent: GetPeopleByDegree (Fuzzy match for degrees like "Mster" -> "M.Sc.")
-    # --------------------------------------------------------------------------
-    elif intent == "GetPeopleByDegree":
-        degree_name = req.get('queryResult', {}).get('parameters', {}).get('DegreeName', '').strip()
-        if not degree_name:
-            return jsonify({'fulfillmentText': "Please provide a degree to search for."})
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)
-            query = sql.SQL("""
-                SELECT fname, lname, degree, similarity(degree, %s) AS sim
-                FROM dummy_facultydata
-                WHERE degree %% %s
-                ORDER BY sim DESC
-                LIMIT 5
-            """)
-            cursor.execute(query, (degree_name, degree_name))
-            results = cursor.fetchall()
-
-            if results:
-                filtered = [row for row in results if row['sim'] > 0.3]
-                if filtered:
-                    top_degree = filtered[0]['degree']
-                    names = [f"{row['fname']} {row['lname']}" for row in filtered]
-                    response_text = (
-                        f"Did you mean '{top_degree}'? "
-                        f"Faculty members:\n" + "\n".join(names)
-                    )
-                else:
-                    response_text = f"No relevant matches found for '{degree_name}'."
-            else:
-                response_text = f"No faculty members found with degrees similar to '{degree_name}'."
-
-        except psycopg2.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
-        finally:
-            cursor.close()
-            conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
-
-    # --------------------------------------------------------------------------
-    # Intent: GetPersonDetails (Fuzzy match for names like "Jhon Doe" -> "John Doe")
-    # --------------------------------------------------------------------------
-    elif intent == "GetPersonDetails":
-        person_name = req.get('queryResult', {}).get('parameters', {}).get('PersonName', '').strip()
-        if not person_name:
-            return jsonify({'fulfillmentText': "Please provide a faculty name to search for."})
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)
-            query = sql.SQL("""
-                SELECT *, similarity(CONCAT(fname, ' ', lname), %s) AS sim
-                FROM dummy_facultydata
-                WHERE CONCAT(fname, ' ', lname) %% %s
-                ORDER BY sim DESC
-                LIMIT 1
-            """)
-            cursor.execute(query, (person_name, person_name))
-            result = cursor.fetchone()
-
-            if result:
-                if result['sim'] > 0.4:  # Higher threshold for names
-                    details = "\n".join([f"{key}: {value}" for key, value in result.items()])
-                    response_text = f"Details for {result['fname']} {result['lname']}:\n{details}"
-                else:
-                    response_text = f"Did you mean {result['fname']} {result['lname']}? Please confirm."
-            else:
-                response_text = f"No faculty members found matching '{person_name}'."
-
-        except psycopg2.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
-        finally:
-            cursor.close()
-            conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
-
-    # --------------------------------------------------------------------------
-    # Intent: GetFacultyByGender (No fuzzy matching needed)
-    # --------------------------------------------------------------------------
-    elif intent == "GetFacultyByGender":
-        gender = req.get('queryResult', {}).get('parameters', {}).get('Gender', '').strip().lower()
-        if not gender:
-            return jsonify({'fulfillmentText': "Please provide a gender to search for."})
-
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'fulfillmentText': "Failed to connect to the database."})
-
-        try:
-            cursor = conn.cursor(cursor_factory=DictCursor)
-            query = "SELECT fname, lname FROM dummy_facultydata WHERE gender ILIKE %s"
-            cursor.execute(query, (gender,))
-            results = cursor.fetchall()
-
-            if results:
-                names = [f"{row['fname']} {row['lname']}" for row in results]
-                response_text = f"{gender.capitalize()} faculty members:\n" + "\n".join(names)
-            else:
-                response_text = f"No {gender} faculty members found."
-
-        except psycopg2.Error as err:
-            print(f"Database error: {err}")
-            response_text = "An error occurred while fetching data."
-        finally:
-            cursor.close()
-            conn.close()
-
-        return jsonify({'fulfillmentText': response_text})
     
     elif intent == "Complaint - custom":
-        complaint = req.get('queryResult', {}).get('parameters', {}).get('complaint_text', '')
-        print(complaint)
-        conn = get_db_connection()
-        if conn:
-            try:
-                with conn.cursor() as cursor:
-                    insert_query = """
-                    INSERT INTO complaint (complaint) 
-                    VALUES (%s);
-                    """
-                    cursor.execute(insert_query, (complaint,))
-                    conn.commit()
-                    return jsonify({'fulfillmentText': "Message saved successfully!"})
-            except psycopg2.Error as e:
-                return jsonify({'fulfillmentText': str(e)})  # Convert exception to string
-            finally:
-                conn.close()
+        parameters = req.get('queryResult', {}).get('parameters', {})
+        complaint_data = parameters.get('complaint_text', [])
+
+        if isinstance(complaint_data, list) and len(complaint_data) == 1:
+            parts = [x.strip() for x in complaint_data[0].split(',')]
+            if len(parts) >= 4: 
+                # Extract parts and convert hostel to lowercase
+                complaint = parts[0]
+                hostel = parts[1].strip().upper()  # Ensure hostel is lowercase
+                room_no = parts[2]
+                date = parts[3]
+
+                conn = get_db_connection()
+                # conn=False
+                if conn:
+                    try:
+                        with conn.cursor() as cursor:
+                            insert_query = """
+                            INSERT INTO complaint (complaint, hostel, room_no, date, issue_solved, roll_no)
+                            VALUES (%s, %s, %s, %s, %s, %s);
+                            """
+                            cursor.execute(insert_query, (complaint, hostel, room_no, date, False, role))
+                            conn.commit()
+                            # Return success message here after successful insertion
+                            return jsonify({'fulfillmentText': "Complaint saved successfully!"})    
+                    except psycopg2.Error as e:
+                        return jsonify({'fulfillmentText': f"Database error: {str(e)}"})
+                    finally:
+                        conn.close()
+    
+                else:
+                    # Handle database connection failure
+                    return jsonify({'fulfillmentText': "Failed to connect to the database."})
+            else:
+                # Not enough parts provided
+                return jsonify({'fulfillmentText': "Please provide full complaint details: issue, hostel, room, date."})
+        else:
+            # Invalid complaint_data format
+            return jsonify({'fulfillmentText': "Invalid complaint format. Please provide data as a list with one string."})
+        
+    elif intent == "complain-Data":
+        parameters = req.get('queryResult', {}).get('parameters', {})
+
+        if role:
+            conn = get_db_connection()
+            if conn:
+                try:
+                    with conn.cursor() as cursor:
+                        # Warden can see all complaints
+                        if role == "warden":
+                            select_query = """
+                            SELECT roll_no, complaint, room_no, date, hostel 
+                            FROM complaint;
+                            """
+                            cursor.execute(select_query)
+
+                        # Hostel support can see only their own hostel complaints
+                        elif role in ["BH1", "BH2", "BH3", "BH4", "BH5"]:
+                            select_query = """
+                            SELECT roll_no, complaint, room_no, date, hostel 
+                            FROM complaint
+                            WHERE hostel = %s;
+                            """
+                            cursor.execute(select_query, (role.upper(),))  # Hostel names likely stored in uppercase
+
+                        else:
+                            return jsonify({'fulfillmentText': "You do not have permission to view complaints."})
+
+                        rows = cursor.fetchall()
+
+                        if not rows:
+                            return jsonify({'fulfillmentText': "No complaints found."})
+
+                        # Format each complaint
+                        response_lines = []
+                        for idx, row in enumerate(rows, start=1):
+                            roll_no, complaint, room_no, date, hostel = row
+                            response_lines.append(
+                                f"Complaint {idx}: {complaint}, Room: {room_no}, Hostel: {hostel}, Date: {date}, Filed by: {roll_no}"
+                            )
+
+                        response_text = "\n".join(response_lines)
+                        return jsonify({'fulfillmentText': response_text})
+
+                except psycopg2.Error as e:
+                    return jsonify({'fulfillmentText': f"Database error: {str(e)}"})
+
+                finally:
+                    conn.close()
+        else:
+            return jsonify({'fulfillmentText': "Please specify your role or hostel name to search for complaints."})
 
     else:
-        return jsonify({'fulfillmentText': "Unhandled intent."})
+        return jsonify({'fulfillmentText': "Unhandled Intent"})
 
 
 if __name__ == '__main__':
