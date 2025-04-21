@@ -62,6 +62,7 @@ INTENT_TO_REFINED_QUERY = {
     "Complaint":"I have an issue",
     "SearchLibraryBooks":"Can you get the ",
     "faculty_data":" ",
+    "general-lnm":" ",
     # Add more mappings here
 }
 
@@ -72,12 +73,12 @@ genai.configure(api_key=GenAI_API_KEY)
 
 def get_book_title_from_gemini(query):
     # URL for the Gemini API (replace this with actual URL if available)
-    gemini_model = genai.GenerativeModel('gemini-1.5-pro')
+    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
 
     # Prepare the payload with your query
     
       
-    prompt=f"Extract the book title from the following sentence and return just the title: {query}"
+    prompt=f"Extract the book title from the following sentence and return just the title even if no full name just written whatever name user has given.solve spelling mistake: {query}"
     
     try:
         response = gemini_model.generate_content(prompt)
@@ -150,9 +151,9 @@ def query_bot():
         if(predicted_intent=="SearchLibraryBooks"):
             refined_query = INTENT_TO_REFINED_QUERY.get(predicted_intent, user_message)+get_book_title_from_gemini(user_message)
             
-        elif(predicted_intent=="faculty_data"):
+        elif predicted_intent in ["faculty-data", "general-lnm"]:
             refined_query=user_message
-            response=search(user_message,model)
+            response=search(user_message,predicted_intent)
             return jsonify({
                 "reply":response
             })
