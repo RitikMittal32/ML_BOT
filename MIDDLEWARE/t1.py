@@ -16,14 +16,18 @@ pc = Pinecone(api_key=Pinecone_API_KEY)
 
 # Load HuggingFace model
 # model = SentenceTransformer('all-mpnet-base-v2')
-
+model = SentenceTransformer('BAAI/bge-small-en')
 # --- Setup ---
 
-INDEX_NAME = "faculty-info"
-index = pc.Index(INDEX_NAME)
+ 
+
 
 # --- Search Function ---
-def search(query,model):
+def search(query,INDEX_NAME):
+    if(INDEX_NAME=="faculty-data"):
+        INDEX_NAME="faculty-info"
+    index = pc.Index(INDEX_NAME)
+        
     # 1. Embed the query
     query_embedding = model.encode([query])[0]
 
