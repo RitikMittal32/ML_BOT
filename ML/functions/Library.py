@@ -185,27 +185,28 @@ def get_book_info(soup):
         # Extract publication details (not present in sample, keeping as fallback)
         publication = "Unknown Publication"
         
-        # Extract call number from holdings table
-        call_number_tag = soup.find("td", class_="call_no")
-        call_number = call_number_tag.text.strip() if call_number_tag else "Unknown Call Number"
+        # Extract DDC classification
+        ddc_tag = record.find("span", class_="results_summary ddc")
+        ddc = ddc_tag.find("li").text.strip() if ddc_tag and ddc_tag.find("li") else "Unknown DDC"
+
+  
         
+        # Extract availability information
         # Extract availability information
         availability = []
         holdings_table = soup.find("table", id="holdingst")
         if holdings_table:
-            for row in holdings_table.find_all("tr")[1:]:  # Skip header row
+            for row in holdings_table.find_all("tr")[1:]:
                 cols = row.find_all("td")
-                if len(cols) >= 7:  # Ensure we have all columns
-                    item_type = cols[0].text.strip()
-                    location = cols[1].text.strip()
-                    status = cols[3].text.strip()
-                    barcode = cols[5].text.strip()
-                    
-                    availability.append(
-                        f"{item_type} at {location} (Barcode: {barcode}): {status}"
-                    )
+                if len(cols) >= 5:
+                    status = cols[4].text.strip()
+                    if "Available" in status:
+                        availability.append("Available")
+                        break
+            else:
+                availability.append("Not Available")
         
-        # Extract holds information
+                # Extract holds information
         holds_tag = soup.find("div", id="bib_holds")
         holds = holds_tag.text.strip() if holds_tag else "No holds information"
         
@@ -214,11 +215,8 @@ def get_book_info(soup):
             f"Title: {title}",
             f"Author: {author}",
             f"ISBN: {isbn}",
-            f"Publication: {publication}",
-            f"Call Number: {call_number}",
-            "\nAvailability:",
-            *(availability if availability else ["No availability information"]),
-            f"\nHolds Information: {holds}"
+            f"Call Number: {ddc}",
+            f"Availability: {availability[0]}"
         ]
         
         return "\n".join(details)

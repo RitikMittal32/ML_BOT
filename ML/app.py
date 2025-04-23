@@ -23,7 +23,7 @@ def get_display_info(session_id):
         if keyword in display_name:
             return display_name, keyword
         
-    for keyword in ["CHIEF WARDEN", "CW", "WARDEN"]:
+    for keyword in ["CHIEF WARDEN", "CW", "WARDEN", "22UCS207"]:
         if keyword in display_name:
             return display_name, "warden"
     

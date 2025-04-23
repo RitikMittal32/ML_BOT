@@ -63,7 +63,6 @@ INTENT_TO_REFINED_QUERY = {
     "SearchLibraryBooks":"Can you get the ",
     "faculty_data":" ",
     "general-lnm":" ",
-    # Add more mappings here
 }
 
 
