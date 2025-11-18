@@ -230,7 +230,7 @@ def webhook():
         else:
             return jsonify({'fulfillmentText': "Please specify your role or hostel name to search for complaints."})
 
-        elif intent == "ViewAvailableSlots":
+    elif intent == "ViewAvailableSlots":
         parameters = req.get('queryResult', {}).get('parameters', {})
         
         # Get parameters from the chatbot request
@@ -371,4 +371,5 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
