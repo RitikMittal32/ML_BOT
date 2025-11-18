@@ -230,9 +230,145 @@ def webhook():
         else:
             return jsonify({'fulfillmentText': "Please specify your role or hostel name to search for complaints."})
 
+        elif intent == "ViewAvailableSlots":
+        parameters = req.get('queryResult', {}).get('parameters', {})
+        
+        # Get parameters from the chatbot request
+        faculty_id = parameters.get('faculty_id')
+        date = parameters.get('date') # This will be in YYYY-MM-DDTHH:MM:SS format
+        
+        if date:
+            # Truncate date parameter to match Spring Boot format (YYYY-MM-DD)
+            date = date.split('T')[0]
+        
+        if not faculty_id or not date:
+            # Should be handled by Dialogflow if parameters are required, but good check
+            return jsonify({'fulfillmentText': "Please provide a faculty ID and date."})
+
+        response_text = get_available_slots_from_api(faculty_id, date)
+        
+        # If slots are available, set context to await selection
+        if "Here are the available slots" in response_text:
+            return jsonify({
+                'fulfillmentText': response_text,
+                'outputContexts': [
+                    {
+                        'name': f"{session_full}/contexts/awaiting_slot_selection",
+                        'lifespanCount': 2,
+                        'parameters': {
+                            'faculty_id': faculty_id,
+                            'date': date
+                        }
+                    }
+                ]
+            })
+        else:
+            return jsonify({'fulfillmentText': response_text})
+
+
+    # This intent handles the user selecting one of the slots (e.g., "book slot 3" or "book 10:30-11:00")
+    elif intent == "ConfirmSlotBooking":
+        parameters = req.get('queryResult', {}).get('parameters', {})
+        
+        # Get parameters from the context set above
+        context_params = {}
+        for context in req.get('queryResult', {}).get('outputContexts', []):
+            if 'awaiting_slot_selection' in context['name']:
+                context_params = context['parameters']
+                break
+        
+        faculty_id = context_params.get('faculty_id')
+        date = context_params.get('date')
+        
+        # Get the actual slot selection from the current user input
+        slot_time = parameters.get('slot_time') # e.g., "10:30"
+        slot_range = parameters.get('slot_range') # e.g., "10:30-11:00"
+
+        # Logic to determine slot ID (since we don't handle numerical selection here, we need the full range)
+        slot_id = slot_range # We assume the user provides the full range (e.g., 10:30-11:00)
+
+        if not faculty_id or not date or not slot_id:
+            return jsonify({'fulfillmentText': "I seem to have lost the booking details. Please start over."})
+
+        # Use the 'role' derived from the session as the student identifier
+        student_uid = role 
+        
+        response_text = book_slot_via_api(faculty_id, date, slot_id, student_uid)
+
+        # Remove the context after booking attempt
+        return jsonify({
+            'fulfillmentText': response_text,
+            'outputContexts': [
+                {
+                    'name': f"{session_full}/contexts/awaiting_slot_selection",
+                    'lifespanCount': 0 # Close the context
+                }
+            ]
+        })
+
     else:
         return jsonify({'fulfillmentText': "Unhandled Intent"})
 
 
+
+SLOTS_API_BASE_URL = 'http://localhost:8080/api/slots'
+
+
+def get_available_slots_from_api(faculty_id, date):
+    """Calls Spring Boot GET endpoint to fetch available slots."""
+    try:
+        url = f"{SLOTS_API_BASE_URL}?facultyId={faculty_id}&date={date}"
+        response = requests.get(url)
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        
+        slots = response.json()
+        
+        if not slots:
+            return "I found no available slots for that date."
+            
+        # Format slots for the user
+        response_text = "Here are the available slots:\n"
+        for idx, slot in enumerate(slots, 1):
+            response_text += f"{idx}. {slot.get('start')} - {slot.get('end')}\n"
+            
+        return response_text
+        
+    except requests.exceptions.RequestException as e:
+        print(f"API Error fetching slots: {e}")
+        return "I'm sorry, I couldn't connect to the booking system right now."
+
+
+def book_slot_via_api(faculty_id, date, slot_id, student_uid):
+    """Calls Spring Boot POST endpoint to book a slot."""
+    try:
+        url = f"{SLOTS_API_BASE_URL}/book"
+        payload = {
+            "facultyId": faculty_id,
+            "date": date,
+            "slotId": slot_id,
+            "studentUid": student_uid # UNSECURED: Matches Spring Boot implementation
+        }
+        
+        response = requests.post(url, json=payload)
+        
+        if response.status_code == 200:
+            return "Your slot has been successfully booked!"
+        
+        elif response.status_code == 409:
+            # Conflict status from Spring Boot (e.g., slot already booked)
+            error_data = response.json()
+            return f"Booking failed: {error_data.get('error', 'The slot is no longer available.')}"
+            
+        else:
+            # General API error
+            error_data = response.json()
+            return f"An error occurred while confirming the booking. Code {response.status_code}. {error_data.get('error', '')}"
+
+    except requests.exceptions.RequestException as e:
+        print(f"API Error booking slot: {e}")
+        return "I'm sorry, there was a system error when trying to book."
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
