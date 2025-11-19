@@ -314,7 +314,7 @@ def webhook():
 
 
 
-SLOTS_API_BASE_URL = 'http://localhost:8080/api/slots'
+SLOTS_API_BASE_URL = 'https://facultyslots.onrender.com/api/slots'
 
 
 def get_available_slots_from_api(faculty_id, date):
@@ -374,6 +374,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
