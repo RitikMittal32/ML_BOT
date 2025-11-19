@@ -398,16 +398,11 @@ def get_available_slots_from_api(faculty_id, date):
         return "I'm sorry, I couldn't connect to the booking system right now."
 
 
-def book_slot_via_api(faculty_id, date, slot_id, student_uid):
+def book_slot_via_api(payload):
     """Calls Spring Boot POST endpoint to book a slot."""
     try:
         url = f"{SLOTS_API_BASE_URL}/book"
-        payload = {
-            "facultyId": faculty_id,
-            "date": date,
-            "slotId": slot_id,
-            "studentUid": student_uid # UNSECURED: Matches Spring Boot implementation
-        }
+        
         
         response = requests.post(url, json=payload)
         
@@ -431,6 +426,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
