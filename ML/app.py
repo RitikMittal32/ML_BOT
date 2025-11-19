@@ -234,7 +234,7 @@ def webhook():
         parameters = req.get('queryResult', {}).get('parameters', {})
         
         # Get parameters from the chatbot request
-        faculty_id = parameters.get('faculty_id')
+        faculty_id = parameters.get('last-name')
         date = parameters.get('date') # This will be in YYYY-MM-DDTHH:MM:SS format
         print("vraj")
         print(faculty_id)
@@ -373,6 +373,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
