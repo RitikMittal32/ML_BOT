@@ -8,8 +8,7 @@ from functions.Events import scrape_college_website
 from functions.Library import get_single_book_details, get_book_list, get_single_book_bibilo
 from functions.Papers import handle_search_papers_intent
 from config.database import get_db_connection
-
-
+from datetime import datetime
 
 
 app = Flask(__name__)
@@ -269,14 +268,20 @@ def webhook():
             return jsonify({'fulfillmentText': response_text})
 
 
-    # This intent handles the user selecting one of the slots (e.g., "book slot 3" or "book 10:30-11:00")
-    # This intent handles the user selecting one of the slots (e.g., "book 10:30-11:00")
+   
+
+
+
+
+
+
+# This intent handles the user selecting one of the slots (e.g., "book 10:30-11:00")
     elif intent == "ConfirmSlotBooking":
         parameters = req.get('queryResult', {}).get('parameters', {})
         
         # Get parameters from the context set above (from ViewAvailableSlots intent)
         context_params = {}
-        session_full = req.get('session') # Full session path is needed to close the context
+        session_full = req.get('session')
         
         for context in req.get('queryResult', {}).get('outputContexts', []):
             if 'awaiting_slot_selection' in context['name']:
@@ -285,27 +290,52 @@ def webhook():
         
         # 1. Get Faculty ID and Date from the context
         faculty_id = context_params.get('faculty_id')
-        date = context_params.get('date') # This should be the YYYY-MM-DD format saved previously
+        date = context_params.get('date') 
         
         # 2. Get the actual slot selection (the ID) from the current user input
         slot_range = parameters.get('slot_range') # e.g., "10:30-11:00"
-
-        # Use the full range as the slot ID
+    
+        # Use the full range as the primary slot ID
         slot_id = slot_range 
-
+    
         if not faculty_id or not date or not slot_id:
+            # If essential data is missing, fail and close context
             return jsonify({
                 'fulfillmentText': "I seem to have lost the booking details. Please start over.",
-                # Close the context if data is missing
                 'outputContexts': [{'name': f"{session_full}/contexts/awaiting_slot_selection", 'lifespanCount': 0}]
             })
-
+    
+        # --- NEW LOGIC TO SATISFY BookingRequest FIELDS ---
+        try:
+            # Extract start and end times from the slot range
+            start_time, end_time = slot_id.split('-')
+            
+            # Calculate duration in minutes (required by the Java class)
+            duration = calculate_duration_minutes(start_time, end_time)
+            
+        except ValueError:
+            # Handle case where slot_id is not in the expected format (e.g., "10:30")
+            return jsonify({'fulfillmentText': "Invalid slot format received. Please try again."})
+        
         # 3. Use the 'role' derived from the session as the student identifier (studentUid)
         student_uid = role 
         
-        # 4. Call the API with the four required fields
-        response_text = book_slot_via_api(faculty_id, date, slot_id, student_uid)
-
+        # 4. Define the COMPLETE payload matching the required Java BookingRequest structure
+        payload = {
+            "facultyId": faculty_id,
+            "date": date,
+            "slotId": slot_id,
+            "studentUid": student_uid,
+            "duration": duration,   # Added
+            "startTime": start_time,# Added
+            "endTime": end_time     # Added
+        }
+        
+        # NOTE: The book_slot_via_api function signature needs to change to accept this payload.
+        # Assuming the API call handles packaging the data correctly.
+        # We will pass the full payload dictionary:
+        response_text = book_slot_via_api(payload) # Changed to accept one payload dictionary
+    
         # Remove the context after booking attempt (success or failure)
         return jsonify({
             'fulfillmentText': response_text,
@@ -323,6 +353,25 @@ def webhook():
 
 
 SLOTS_API_BASE_URL = 'https://facultyslots.onrender.com/api/slots'
+
+# Helper function to calculate duration in minutes
+def calculate_duration_minutes(start_str, end_str):
+    """Calculates the time difference in minutes between two HH:MM strings."""
+    try:
+        # Define a consistent date part for comparison (date doesn't matter, only time difference)
+        base_date = '1970-01-01 '
+        
+        # Parse the full datetime objects
+        start_dt = datetime.strptime(base_date + start_str, '%Y-%m-%d %H:%M')
+        end_dt = datetime.strptime(base_date + end_str, '%Y-%m-%d %H:%M')
+        
+        # Calculate difference and convert to minutes
+        duration = (end_dt - start_dt).total_seconds() / 60
+        return int(duration)
+    except Exception:
+        # Fallback if parsing fails
+        return 30 # Default to 30 minutes if calculation fails
+
 
 
 def get_available_slots_from_api(faculty_id, date):
@@ -382,6 +431,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
