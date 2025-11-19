@@ -236,7 +236,8 @@ def webhook():
         # Get parameters from the chatbot request
         faculty_id = parameters.get('faculty_id')
         date = parameters.get('date') # This will be in YYYY-MM-DDTHH:MM:SS format
-        
+        print(faculty_id)
+        print(date)
         if date:
             # Truncate date parameter to match Spring Boot format (YYYY-MM-DD)
             date = date.split('T')[0]
@@ -371,5 +372,6 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
