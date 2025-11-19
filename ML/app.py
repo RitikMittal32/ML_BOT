@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import requests
 import psycopg2
 from psycopg2.extras import DictCursor 
 from psycopg2 import sql
@@ -320,7 +321,7 @@ def get_available_slots_from_api(faculty_id, date):
     """Calls Spring Boot GET endpoint to fetch available slots."""
     try:
         url = f"{SLOTS_API_BASE_URL}?facultyId={faculty_id}&date={date}"
-        response = request.get(url)
+        response = requests.get(url)
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
         
         slots = response.json()
@@ -335,7 +336,7 @@ def get_available_slots_from_api(faculty_id, date):
             
         return response_text
         
-    except request.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as e:
         print(f"API Error fetching slots: {e}")
         return "I'm sorry, I couldn't connect to the booking system right now."
 
@@ -351,7 +352,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
             "studentUid": student_uid # UNSECURED: Matches Spring Boot implementation
         }
         
-        response = request.post(url, json=payload)
+        response = requests.post(url, json=payload)
         
         if response.status_code == 200:
             return "Your slot has been successfully booked!"
@@ -366,13 +367,14 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
             error_data = response.json()
             return f"An error occurred while confirming the booking. Code {response.status_code}. {error_data.get('error', '')}"
 
-    except request.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as e:
         print(f"API Error booking slot: {e}")
         return "I'm sorry, there was a system error when trying to book."
 
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
