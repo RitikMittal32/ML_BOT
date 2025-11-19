@@ -270,35 +270,43 @@ def webhook():
 
 
     # This intent handles the user selecting one of the slots (e.g., "book slot 3" or "book 10:30-11:00")
+    # This intent handles the user selecting one of the slots (e.g., "book 10:30-11:00")
     elif intent == "ConfirmSlotBooking":
         parameters = req.get('queryResult', {}).get('parameters', {})
         
-        # Get parameters from the context set above
+        # Get parameters from the context set above (from ViewAvailableSlots intent)
         context_params = {}
+        session_full = req.get('session') # Full session path is needed to close the context
+        
         for context in req.get('queryResult', {}).get('outputContexts', []):
             if 'awaiting_slot_selection' in context['name']:
                 context_params = context['parameters']
                 break
         
+        # 1. Get Faculty ID and Date from the context
         faculty_id = context_params.get('faculty_id')
-        date = context_params.get('date')
+        date = context_params.get('date') # This should be the YYYY-MM-DD format saved previously
         
-        # Get the actual slot selection from the current user input
-        slot_time = parameters.get('slot_time') # e.g., "10:30"
+        # 2. Get the actual slot selection (the ID) from the current user input
         slot_range = parameters.get('slot_range') # e.g., "10:30-11:00"
 
-        # Logic to determine slot ID (since we don't handle numerical selection here, we need the full range)
-        slot_id = slot_range # We assume the user provides the full range (e.g., 10:30-11:00)
+        # Use the full range as the slot ID
+        slot_id = slot_range 
 
         if not faculty_id or not date or not slot_id:
-            return jsonify({'fulfillmentText': "I seem to have lost the booking details. Please start over."})
+            return jsonify({
+                'fulfillmentText': "I seem to have lost the booking details. Please start over.",
+                # Close the context if data is missing
+                'outputContexts': [{'name': f"{session_full}/contexts/awaiting_slot_selection", 'lifespanCount': 0}]
+            })
 
-        # Use the 'role' derived from the session as the student identifier
+        # 3. Use the 'role' derived from the session as the student identifier (studentUid)
         student_uid = role 
         
+        # 4. Call the API with the four required fields
         response_text = book_slot_via_api(faculty_id, date, slot_id, student_uid)
 
-        # Remove the context after booking attempt
+        # Remove the context after booking attempt (success or failure)
         return jsonify({
             'fulfillmentText': response_text,
             'outputContexts': [
@@ -374,6 +382,7 @@ def book_slot_via_api(faculty_id, date, slot_id, student_uid):
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
 
 
 
